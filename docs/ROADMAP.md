@@ -11,6 +11,9 @@ How this file is kept:
 
 ## Product steps (draft)
 
+Numbers are stable IDs (history, specs and backlog refer to them), not the build order. The README shows the
+suggested order.
+
 | # | Step | Status |
 |---|---|---|
 | 0 | Skeleton: monorepo, `compose.yaml` with `develop.watch`, healthchecks, harness serves `/health` and reloads on file save | done: history 000 |
@@ -25,6 +28,14 @@ How this file is kept:
 | 9 | Observability: agent traces (Langfuse / OpenTelemetry), logs with trace-id across all services | — |
 | 10 | Kubernetes: minikube/kind + Tilt, same services, same hot-reload | — |
 | 11 | Evals: a dataset of cases and agent quality regression | — |
+| 12 | Custom tools as plugins: tools packaged and registered without touching the agent core | — |
+| 13 | Dictionaries: per-environment values that skills reference by name. One skill (say "update the deal amount") works across environments where the same MCP server exposes different internals (`cf_12345` in one CRM, `UF_CRM_AMOUNT` in another) | — |
+| 14 | Multi-tenancy: tenant isolation for threads, skills, dictionaries, MCP credentials | — |
+| 15 | SSO / OAuth (OIDC) on top of the Go auth service | — |
+| 16 | Inbound integrations: external systems (CRM, messengers, internal services) authenticate to harness with OAuth 2.0 client credentials or scoped, per-tenant API keys (service tokens issued by auth), and trigger agent runs via `/webhooks/...` endpoints. Includes signature verification, idempotency keys, async runs with results delivered by callback or polling, and rate limits | — |
+
+Distribution: open core. The foundation stays open source (Apache-2.0); some enterprise capabilities may
+ship separately.
 
 ## Next up (proposed, in suggested order)
 
@@ -46,7 +57,7 @@ How this file is kept:
 | `FLUSH_INTERVAL` in config | it's a constant now | when it needs tuning without a release | spec 003 |
 | Usage / cost in `done` | `done` is `{}`. RouterAI sends usage in the last chunk on its own, so `usage_metadata` per LLM call is already there, including `output_token_details.reasoning`. Our class doesn't request it: `_should_stream_usage()` is `False` for a custom `base_url`. What's left is summing it across the calls in a run | cost visibility in the UI or admin | spec 004, history 005 |
 | Reasoning settings (effort, on/off) | reasoning is whatever the provider sends by default; no per-request or config control. Also, one live run came back without reasoning (provider variance) | cost/latency tuning, or a "fast mode" toggle in the UI | spec 005 non-goals, history 005 |
-| Echo reasoning back within a ReAct loop | DeepSeek docs: within a turn with `tools`, `reasoning_content` "must be fully passed back… otherwise 400"; across turns it's ignored, so there's no context bloat. `ChatDeepSeek` 1.1.1 never sends it back. RouterAI tolerates that, but the answer after a tool comes without reasoning. Plan: echo within a turn, drop across turns | long tool chains (step 4) or a switch to the native DeepSeek API | history 005 |
+| Echo reasoning back within a ReAct loop | DeepSeek docs: within a turn with `tools`, `reasoning_content` "must be fully passed back… otherwise 400"; across turns it's ignored, so there's no context bloat. `ChatDeepSeek` 1.1.1 never sends it back. RouterAI tolerates that. The answer after a tool came without reasoning once, though other runs did reason after `tool_result`. Plan: echo within a turn, drop across turns | long tool chains (step 4) or a switch to the native DeepSeek API | history 005 |
 | `interrupt` terminal event | the root graph swallows `GraphInterrupt` and emits `__interrupt__` in `updates`, so a paused run ends with `done` | human-in-the-loop (with deepagents, step 4) | history 004 |
 | Error code for context overflow | `ContextOverflowError` is `internal` now; the user can't act on that | memory (step 3) makes long histories common | history 004 |
 | Streaming fake with tool calls | `StreamingFakeModel` streams text only, so tool-call chunk streaming (`tool_call_chunks`) is untested | big-argument tools (step 4) | history 004 |
