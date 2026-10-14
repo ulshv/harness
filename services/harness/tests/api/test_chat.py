@@ -76,6 +76,32 @@ def test_invoke_plain_answer(make_client):
     }
 
 
+def test_stream_reasoning_then_answer(make_client):
+    model = StreamingFakeModel(reasoning=["Let", " me"], chunks=["Hi"])
+
+    resp = make_client(model).post("/chat/stream", json={"message": "hi"})
+
+    assert sse_events(resp.text) == [
+        ("reasoning", {"text": "Let me"}),
+        ("text", {"text": "Hi"}),
+        ("done", {}),
+    ]
+
+
+def test_invoke_merges_reasoning_like_text(make_client):
+    model = StreamingFakeModel(reasoning=["Let", " me"], chunks=["H", "i"])
+
+    resp = make_client(model).post("/chat/invoke", json={"message": "hi"})
+
+    assert resp.json() == {
+        "events": [
+            {"type": "reasoning", "text": "Let me"},
+            {"type": "text", "text": "Hi"},
+            {"type": "done"},
+        ]
+    }
+
+
 def test_stream_delivers_buffered_text_before_the_error(make_client):
     model = StreamingFakeModel(chunks=["Hel", "lo"], error=PROVIDER_DOWN)
 
@@ -145,6 +171,7 @@ def test_invoke_schema_discriminates_events_by_type(make_client):
         "propertyName": "type",
         "mapping": {
             "text": "#/components/schemas/TextEvent",
+            "reasoning": "#/components/schemas/ReasoningEvent",
             "tool_call": "#/components/schemas/ToolCallEvent",
             "tool_result": "#/components/schemas/ToolResultEvent",
             "done": "#/components/schemas/DoneEvent",

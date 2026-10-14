@@ -18,6 +18,12 @@ class TextEvent(_Event):
     text: str
 
 
+# the model's thinking before/between answers; the frontend shows it in a spoiler
+class ReasoningEvent(_Event):
+    type: Literal["reasoning"] = "reasoning"
+    text: str
+
+
 class ToolCallEvent(_Event):
     type: Literal["tool_call"] = "tool_call"
     id: str | None
@@ -50,7 +56,12 @@ class ErrorEvent(_Event):
 
 # discriminator → OpenAPI oneOf + mapping, so generated clients can narrow the union by `type`
 type ChatEvent = Annotated[
-    TextEvent | ToolCallEvent | ToolResultEvent | DoneEvent | ErrorEvent,
+    TextEvent
+    | ReasoningEvent
+    | ToolCallEvent
+    | ToolResultEvent
+    | DoneEvent
+    | ErrorEvent,
     Field(discriminator="type"),
 ]
 

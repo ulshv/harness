@@ -23,8 +23,8 @@ POST /chat/stream                             POST /chat/invoke
   ▼                                             ▼
   append_error_or_done ── api/chat/outcome.py: + done on success, exception → error
   ▼                                             ▼
-  batch_text_events(window=0.05)                batch_text_events(window=inf)
-  │  api/chat/batching.py: merge adjacent TextEvents
+  batch_events(window=0.05)                     batch_events(window=inf)
+  │  api/chat/batching.py: merge adjacent same-kind text/reasoning events
   ▼                                             ▼
   one SSE frame per event                       200 ChatResponse(events=[..., done])
                                                 or 500 ErrorEvent
@@ -39,11 +39,11 @@ the wire, so a test through `/invoke` checks the same mapping the UI gets throug
 |---|---|---|---|
 | translate | `api/chat/stream.py` | LangGraph `astream` parts → `ChatEvent` | LangGraph, messages |
 | terminate | `api/chat/outcome.py` | `ChatEvent` → `ChatEvent` + `done` or `error` | exceptions, error codes |
-| batch | `api/chat/batching.py` | `ChatEvent` → `ChatEvent` (fewer `TextEvent`s) | time, `TextEvent` |
+| batch | `api/chat/batching.py` | `ChatEvent` → `ChatEvent` (fewer text/reasoning events) | time, `TextEvent`, `ReasoningEvent` |
 | encode | `api/chat/chat.py` | `ChatEvent` → SSE frame / JSON | HTTP, SSE |
 
 Each stage is an async generator over the previous one, so they compose like pipes and each can be
-tested alone. `ChatEvent = TextEvent | ToolCallEvent | ToolResultEvent | DoneEvent | ErrorEvent`
+tested alone. `ChatEvent = TextEvent | ReasoningEvent | ToolCallEvent | ToolResultEvent | DoneEvent | ErrorEvent`
 (`api/chat/schemas.py`) is a discriminated union on `type`; OpenAPI shows it as a named `ChatEvent` schema with `discriminator.mapping`.
 
 ## Translate: graph parts → events
@@ -54,11 +54,19 @@ message type.
 
 | What happened in the graph | Stream mode | Handler | Event |
 |---|---|---|---|
-| the LLM produced another piece of text | `messages` | `_from_tokens` | `TextEvent` |
+| the LLM produced another piece of text | `messages` | `_from_tokens` → `_BY_BLOCK["text"]` | `TextEvent` |
+| the LLM produced another piece of reasoning | `messages` | `_from_tokens` → `_BY_BLOCK["reasoning"]` | `ReasoningEvent` |
 | `agent` finished, the reply has `tool_calls` | `updates` | `_from_updates` → `_from_message(AIMessage)` | `ToolCallEvent` |
 | `tools` returned a `ToolMessage` | `updates` | `_from_message(ToolMessage)` | `ToolResultEvent` |
 
-Two subtleties:
+`_from_tokens` reads `msg.content_blocks`, langchain-core's provider-neutral view of a message: text
+becomes `{"type": "text"}`, and `additional_kwargs["reasoning_content"]` becomes `{"type": "reasoning"}`
+(Anthropic's thinking would map to the same block). `_BY_BLOCK` maps block type to event; other blocks
+(`tool_call_chunk`, …), empty strings, and reasoning blocks without text (signature-only; `reasoning` is
+`NotRequired` in langchain-core) are skipped. Reasoning is optional: providers don't always send it, so a
+client must not wait for it.
+
+Two more subtleties:
 
 - The finished `AIMessage` also arrives in `updates`, but its text has already gone out as `TextEvent`s.
   Only its `tool_calls` are taken, otherwise the answer would be duplicated.
@@ -79,7 +87,7 @@ batched text is flushed before them, and text that arrived before a failure stil
 | `GraphRecursionError` | `recursion_limit` |
 | anything else, including provider 4xx (bad key, unknown model, context overflow) | `internal` |
 
-The classes are langchain-core's provider-neutral errors; langchain-openai raises subclasses of them. Only
+The classes are langchain-core's provider-neutral errors; langchain-openai (and `ChatDeepSeek`, built on it) raises subclasses of them. Only
 what a retry can fix is `llm_*`.
 
 The client gets the code and a fixed message. The exception and traceback go to the log only
@@ -92,20 +100,21 @@ Limits of the guarantee: it covers the graph and the translator. An exception in
 still ends the stream without a terminal event. An interrupted run (`GraphInterrupt`, future
 human-in-the-loop) ends with `done` for now.
 
-## Batch: fewer text frames
+## Batch: fewer text and reasoning frames
 
 The LLM streams roughly one token per chunk, so one frame per token is mostly SSE framing: about 32 B of
-framing per ~5 B token, 87% of the wire. `batch_text_events(events, window)` buffers text and flushes it:
+framing per ~5 B token, 87% of the wire. Reasoning is even chattier. `batch_events(events, window)`
+buffers a run of the same kind (`TextEvent` or `ReasoningEvent`) and flushes it:
 
-1. when a `TextEvent` arrives and the buffer is at least `window` old (counted from its first chunk);
-2. before any non-text event, so order is preserved. Two AI messages never merge because the ReAct graph
+1. when a chunk arrives and the buffer is at least `window` old (counted from its first chunk);
+2. when the kind changes (reasoning → text), before any other event, so order is preserved. Two AI messages never merge because the ReAct graph
    always puts a `tool_call` between them; batching itself only merges contiguous text;
 3. at the end of the stream.
 
 | Route | Window | Effect |
 |---|---|---|
-| `/chat/stream` | `TEXT_FLUSH_INTERVAL = 0.05` s | ~20 frames/s; a ~120-word answer: ~174 frames → 11 |
-| `/chat/invoke` | `math.inf` | time never flushes: one `text` event per contiguous AI text block |
+| `/chat/stream` | `FLUSH_INTERVAL = 0.05` s | ~20 frames/s; a ~120-word answer: ~174 text frames → 11–17; 668 chars of reasoning → 15 frames |
+| `/chat/invoke` | `math.inf` | time never flushes: one `reasoning` / `text` event per contiguous block |
 
 There is no timer. If the provider stalls mid-text, the last ≤50 ms of text waits for the next event.
 The trade-off and the upgrade path are in [specs/003](../specs/003_chat-stream-invoke-batching.md#trade-off-provider-pauses).
@@ -116,6 +125,9 @@ SSE (`/chat/stream`): the event kind is the `event:` line, and `data` is the eve
 compact JSON (`raw_data=event.model_dump_json(exclude={"type"})`).
 
 ```
+event: reasoning
+data: {"text":"The user wants the current time; I should call current_time."}
+
 event: tool_call
 data: {"id":"call_1","name":"current_time","args":{}}
 
@@ -174,7 +186,10 @@ remains the exact merged form of the stream.
 - `api/deps.py`: `Graph = Annotated[CompiledStateGraph, Depends(get_graph)]`; routes just declare `graph: Graph`.
 - `settings.py`: `LLMSettings` reads `LLM_*` env. The URL is validated, the model is non-empty, and the
   key is a `SecretStr`.
-- `agent/llm.py`: `ChatOpenAI` pointed at the OpenAI-compatible RouterAI `base_url`.
+- `agent/llm.py`: `ChatDeepSeek` (langchain-deepseek) pointed at the OpenAI-compatible RouterAI `base_url`. It's a
+  `BaseChatOpenAI` subclass on the `openai` SDK. Unlike `ChatOpenAI`, which drops non-standard fields, it lifts
+  RouterAI's OpenRouter-style `delta.reasoning` into `additional_kwargs["reasoning_content"]`. Provider errors
+  are still `langchain_core.exceptions.Model*Error` subclasses.
 
 ## Reading order
 
@@ -182,7 +197,7 @@ remains the exact merged form of the stream.
 2. `api/chat/chat.py`: two routes, the pipeline in two lines each.
 3. `api/chat/stream.py`: how the graph's progress becomes events.
 4. `api/chat/outcome.py`: the terminal events and the error table.
-5. `api/chat/batching.py`: one generator, about 15 lines.
+5. `api/chat/batching.py`: one generator, about 20 lines.
 6. `api/chat/schemas.py`, `main.py`, `api/deps.py`: contracts and wiring.
 7. Tests: `tests/api/test_chat.py` runs the same flow with a scripted fake model ("call the tool", then
    "answer") and a streaming fake that can fail mid-stream; `tests/api/chat/` covers translator, outcome
@@ -197,5 +212,5 @@ and `curl -N` `/chat/stream`. The raw parts show up in the compose logs.
    <details><summary>Answer</summary>After `tools` runs, the graph has nowhere to go and the run ends. The client gets `tool_call` and `tool_result` but no answer, because the model never sees the tool's result. `compile()` doesn't complain: a node without outgoing edges is a valid end of the run (verified on langgraph 1.2.15).</details>
 2. Why does `/chat/invoke` fold the event pipeline instead of calling `graph.ainvoke()` and reading the final state?
    <details><summary>Answer</summary>To keep one source of truth. With `ainvoke`, `/invoke` would bypass the translator and the streaming request to the provider, and a test through `/invoke` could pass while `/stream` is broken. Folding the same pipeline with `window=inf` makes `/invoke` the exact merged form of what `/stream` sends.</details>
-3. Why does `append_error_or_done` sit before `batch_text_events` and not after it?
+3. Why does `append_error_or_done` sit before `batch_events` and not after it?
    <details><summary>Answer</summary>When the source raises, batching would propagate the exception and drop its buffered text. Placed before batching, the exception becomes an `ErrorEvent`, a non-text event, and batching flushes the buffered text before passing it on. The partial answer reaches the client, then `error`.</details>

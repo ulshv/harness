@@ -7,6 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk
+from pydantic import Field
 
 from app.agent.graph import build_graph
 from app.main import create_app
@@ -20,9 +21,11 @@ class FakeToolModel(FakeMessagesListChatModel):
         return self
 
 
-# streams scripted text chunks, then optionally raises: the path a real model takes through "messages" mode
+# streams scripted reasoning chunks, then text chunks, then optionally raises:
+# the path a real model takes through "messages" mode
 class StreamingFakeModel(BaseChatModel):
     chunks: list[str]
+    reasoning: list[str] = Field(default_factory=list)
     error: Exception | None = None
 
     @property
@@ -37,6 +40,12 @@ class StreamingFakeModel(BaseChatModel):
 
     async def _astream(self, messages, stop=None, run_manager=None, **kwargs):
         # no on_llm_new_token here: langchain-core fires it for every chunk _astream yields
+        for thought in self.reasoning:
+            # the shape ChatDeepSeek produces from RouterAI's `delta.reasoning`
+            reasoning = AIMessageChunk(
+                content="", additional_kwargs={"reasoning_content": thought}
+            )
+            yield ChatGenerationChunk(message=reasoning)
         for text in self.chunks:
             yield ChatGenerationChunk(message=AIMessageChunk(content=text))
         if self.error:

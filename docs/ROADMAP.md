@@ -14,7 +14,7 @@ How this file is kept:
 | # | Step | Status |
 |---|---|---|
 | 0 | Skeleton: monorepo, `compose.yaml` with `develop.watch`, healthchecks, harness serves `/health` and reloads on file save | done: history 000 |
-| 1 | First agent: LangGraph agent with one tool, token streaming over SSE, verify with `curl -N` | done: history 001; extended in 002 (production layout), 003 (`/chat/stream` + `/chat/invoke`, batching) and 004 (`error` / `done` events) |
+| 1 | First agent: LangGraph agent with one tool, token streaming over SSE, verify with `curl -N` | done: history 001; extended in 002 (production layout), 003 (`/chat/stream` + `/chat/invoke`, batching) 004 (`error` / `done` events) and 005 (`reasoning` event) |
 | 2 | React chat with streaming | — |
 | 3 | Memory: threads and Postgres checkpointer, conversation continues after a restart | — |
 | 4 | deepagents: planning, virtual FS, subagents; the agent's todo list visible in the UI | — |
@@ -28,27 +28,25 @@ How this file is kept:
 
 ## Next up (proposed, in suggested order)
 
-1. **`reasoning` event.** DeepSeek v4.1 flash takes ~11.6 s to the first token, and `ChatOpenAI` drops its
-   reasoning, so the user stares at nothing. Stream reasoning as its own event. This is likely also the trigger
-   for the batching timer upgrade (see the backlog).
-   *Source: live measurement, spec 003.*
-2. **React chat (roadmap step 2).** The event contract is ready for a frontend: a discriminated `ChatEvent`
-   union in OpenAPI, `id` / `tool_call_id` pairing, batched text.
-3. **Memory (roadmap step 3).** `thread_id` + checkpointer, so the agent remembers the conversation; start
+1. **React chat (roadmap step 2).** The event contract is ready for a frontend: a discriminated `ChatEvent`
+   union in OpenAPI, `id` / `tool_call_id` pairing, batched text, `reasoning` for a spoiler, `done` / `error`.
+2. **Memory (roadmap step 3).** `thread_id` + checkpointer, so the agent remembers the conversation; start
    in memory, then Postgres.
 
 ## Backlog
 
 | Idea | Why | When it starts to matter | Source |
 |---|---|---|---|
-| Batching timer (`asyncio.wait` on one outstanding `anext()` task) | text waits for the next event during provider stalls and while tool-call args stream | big-argument tools (step 4), streamed reasoning | spec 003, history 003 |
+| Batching timer (`asyncio.wait` on one outstanding `anext()` task) | text waits for the next event during provider stalls and while tool-call args stream | big-argument tools (step 4); streamed reasoning showed no stalls (history 005) | spec 003, history 003 |
 | Client-disconnect cleanup | a disconnect is noticed only on the next send (keepalive ping ≤15 s); inner generators are closed by the asyncgen finalizer, not an explicit `aclose()` | long tools / subagents (step 4) | history 002, 003 |
 | Non-text tool results, `invalid_tool_calls` | `ToolResultEvent.content` uses `msg.text` and drops images/resources; invalid tool calls aren't surfaced | MCP (step 8) | history 002 |
 | Non-root container user | the agent would act as root inside the container | filesystem tools (step 4) | history 000 |
 | `init: true` in compose | nothing reaps zombie processes | MCP stdio subprocesses (step 8) | history 000 |
 | `--timeout-graceful-shutdown` in the image `CMD` too | only the dev `command` has it; in prod an open SSE stream can delay shutdown | first prod-like deploy (step 10) | history 000 |
-| `TEXT_FLUSH_INTERVAL` in config | it's a constant now | when it needs tuning without a release | spec 003 |
-| Usage / cost in `done` | `done` is `{}`; `ChatOpenAI` turns `stream_usage` off for a custom `base_url`, and usage must be summed across all LLM calls in a run | cost visibility in the UI or admin | spec 004 |
+| `FLUSH_INTERVAL` in config | it's a constant now | when it needs tuning without a release | spec 003 |
+| Usage / cost in `done` | `done` is `{}`. RouterAI sends usage in the last chunk on its own, so `usage_metadata` per LLM call is already there, including `output_token_details.reasoning`. Our class doesn't request it: `_should_stream_usage()` is `False` for a custom `base_url`. What's left is summing it across the calls in a run | cost visibility in the UI or admin | spec 004, history 005 |
+| Reasoning settings (effort, on/off) | reasoning is whatever the provider sends by default; no per-request or config control. Also, one live run came back without reasoning (provider variance) | cost/latency tuning, or a "fast mode" toggle in the UI | spec 005 non-goals, history 005 |
+| Echo reasoning back within a ReAct loop | DeepSeek docs: within a turn with `tools`, `reasoning_content` "must be fully passed back… otherwise 400"; across turns it's ignored, so there's no context bloat. `ChatDeepSeek` 1.1.1 never sends it back. RouterAI tolerates that, but the answer after a tool comes without reasoning. Plan: echo within a turn, drop across turns | long tool chains (step 4) or a switch to the native DeepSeek API | history 005 |
 | `interrupt` terminal event | the root graph swallows `GraphInterrupt` and emits `__interrupt__` in `updates`, so a paused run ends with `done` | human-in-the-loop (with deepagents, step 4) | history 004 |
 | Error code for context overflow | `ContextOverflowError` is `internal` now; the user can't act on that | memory (step 3) makes long histories common | history 004 |
 | Streaming fake with tool calls | `StreamingFakeModel` streams text only, so tool-call chunk streaming (`tool_call_chunks`) is untested | big-argument tools (step 4) | history 004 |

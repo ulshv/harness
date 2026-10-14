@@ -2,8 +2,8 @@ import asyncio
 import math
 
 from app.api.chat import batching
-from app.api.chat.batching import batch_text_events
-from app.api.chat.schemas import TextEvent, ToolCallEvent
+from app.api.chat.batching import batch_events
+from app.api.chat.schemas import ReasoningEvent, TextEvent, ToolCallEvent
 
 CALL = ToolCallEvent(id="c1", name="current_time", args={})
 
@@ -14,7 +14,7 @@ def coalesce(events, window):
             yield event
 
     async def run():
-        return [event async for event in batch_text_events(source(), window)]
+        return [event async for event in batch_events(source(), window)]
 
     return asyncio.run(run())
 
@@ -40,4 +40,22 @@ def test_other_events_flush_the_buffer_first():
         TextEvent(text="ab"),
         CALL,
         TextEvent(text="c"),
+    ]
+
+
+def test_runs_of_the_same_kind_merge_separately():
+    events = [
+        ReasoningEvent(text="a"),
+        ReasoningEvent(text="b"),
+        TextEvent(text="c"),
+        TextEvent(text="d"),
+        CALL,
+        TextEvent(text="e"),
+    ]
+
+    assert coalesce(events, window=math.inf) == [
+        ReasoningEvent(text="ab"),
+        TextEvent(text="cd"),
+        CALL,
+        TextEvent(text="e"),
     ]

@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
-from app.api.chat.batching import batch_text_events
+from app.api.chat.batching import batch_events
 from app.api.chat.outcome import append_error_or_done
 from app.api.chat.schemas import ChatRequest, ChatResponse, ErrorEvent
 from app.api.chat.stream import chat_events
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/chat")
 @router.post("/stream", response_class=EventSourceResponse)
 async def stream(req: ChatRequest, graph: Graph) -> AsyncIterable[ServerSentEvent]:
     # append_error_or_done sits before batching: done/error are non-text events, so buffered text flushes first
-    events = batch_text_events(append_error_or_done(chat_events(graph, req.message)))
+    events = batch_events(append_error_or_done(chat_events(graph, req.message)))
     async for event in events:
         # the SSE event name already says what it is, so `type` stays out of the payload;
         # raw_data + model_dump_json keeps pydantic's compact JSON (a dict would go through json.dumps, with spaces)
@@ -32,8 +32,8 @@ async def stream(req: ChatRequest, graph: Graph) -> AsyncIterable[ServerSentEven
     "/invoke", response_model=ChatResponse, responses={500: {"model": ErrorEvent}}
 )
 async def invoke(req: ChatRequest, graph: Graph) -> ChatResponse | JSONResponse:
-    # infinite window: time never flushes, so each contiguous run of text merges into one event
-    stream = batch_text_events(
+    # infinite window: time never flushes, so each contiguous text/reasoning run merges into one event
+    stream = batch_events(
         append_error_or_done(chat_events(graph, req.message)), window=math.inf
     )
     events = [event async for event in stream]

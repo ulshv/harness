@@ -8,7 +8,13 @@ from typing import Any
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.graph.state import CompiledStateGraph
 
-from app.api.chat.schemas import ChatEvent, TextEvent, ToolCallEvent, ToolResultEvent
+from app.api.chat.schemas import (
+    ChatEvent,
+    ReasoningEvent,
+    TextEvent,
+    ToolCallEvent,
+    ToolResultEvent,
+)
 
 
 async def chat_events(
@@ -27,9 +33,16 @@ async def chat_events(
 # "messages" part data: (chunk, metadata); metadata says which node produced it (langgraph_node, langgraph_step)
 def _from_tokens(data: tuple[BaseMessage, dict[str, Any]]) -> Iterable[ChatEvent]:
     msg, _metadata = data
-    # "messages" also replays finished ToolMessages; only AI text becomes a TextEvent
-    if isinstance(msg, AIMessage) and msg.text:
-        yield TextEvent(text=msg.text)
+    # "messages" also replays finished ToolMessages; only AI chunks carry text/reasoning
+    if not isinstance(msg, AIMessage):
+        return
+    # content_blocks is langchain-core's provider-neutral view: reasoning_content kwargs (DeepSeek, Ollama…)
+    # and Anthropic thinking both become {"type": "reasoning"}; other blocks (tool_call_chunk…) are skipped
+    for block in msg.content_blocks:
+        if (to_event := _BY_BLOCK.get(block["type"])) and (
+            event := to_event(block)
+        ).text:
+            yield event
 
 
 # "updates" part data: {node_name: what that node returned}, e.g. {"tools": {"messages": [ToolMessage]}}
@@ -58,7 +71,7 @@ def _from_message(msg: BaseMessage) -> Iterable[ChatEvent]:
     return ()
 
 
-# the finished AI message: its text already went out as TextEvents, so only tool calls are new here
+# the finished AI message: its text/reasoning already went out as chunks, so only tool calls are new here
 @_from_message.register
 def _(msg: AIMessage) -> Iterable[ChatEvent]:
     return (
@@ -73,6 +86,12 @@ def _(msg: ToolMessage) -> Iterable[ChatEvent]:
         ToolResultEvent(tool_call_id=msg.tool_call_id, name=msg.name, content=msg.text),
     )
 
+
+_BY_BLOCK: dict[str, Callable[[Any], TextEvent | ReasoningEvent]] = {
+    "text": lambda block: TextEvent(text=block["text"]),
+    # `reasoning` is NotRequired: a signature-only block (Bedrock, OpenAI Responses) has no text
+    "reasoning": lambda block: ReasoningEvent(text=block.get("reasoning", "")),
+}
 
 _BY_MODE: dict[str, Callable[[Any], Iterable[ChatEvent]]] = {
     "messages": _from_tokens,
