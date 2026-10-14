@@ -41,3 +41,16 @@ git clone --depth 1 --branch 0.143.1 https://github.com/fastapi/fastapi
 ```
 
 langchain-ai monorepos tag as `pkg==X.Y.Z`, langgraph as plain `X.Y.Z`.
+
+## Step 1 (2026-10-14): LLM key
+
+```bash
+cp .env.example .env    # gitignored
+# put the RouterAI key into LLM_API_KEY (routerai.ru → settings → API keys)
+```
+
+Model list (OpenRouter-style API, ids are `vendor/model`):
+
+```bash
+curl -s https://routerai.ru/api/v1/models | jq -r '.data[].id' | grep deepseek
+```

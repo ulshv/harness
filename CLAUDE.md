@@ -80,8 +80,9 @@ moves very fast, so treat everything you remember from training as outdated unti
 | uv | 0.11.22 | Dockerfile (`ghcr.io/astral-sh/uv`) |
 | FastAPI / uvicorn | 0.143.1 / 0.54.0 | `pyproject.toml` |
 | pytest / ruff / httpx2 | 9.1.1 / 0.17.0 / 2.13.1 | dev group |
-| langchain / langchain-core | 1.4.5 / 1.6.10 | added at step 1 |
-| langgraph | 1.2.15 | step 1 |
+| langgraph | 1.2.15 | `pyproject.toml` (step 1) |
+| langchain-openai / langchain-core | 1.7.2 / 1.6.10 (transitive) | `pyproject.toml` (step 1) |
+| langchain | 1.4.5 | not used yet (`create_agent` hides the graph) |
 | deepagents | 0.7.25 | step 4 |
 | langchain-mcp-adapters | 0.3.2 | step 8 |
 | langgraph-checkpoint-postgres | 3.1.3 | step 3 |

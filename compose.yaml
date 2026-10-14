@@ -1,10 +1,14 @@
 services:
   harness:
     build: ./services/harness
-    # --reload is dev-only: the image's default CMD is the prod command without it
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # --reload is dev-only: the image's default CMD is the prod command without it.
+    # --reload-dir: watch only our code, not thousands of dirs in .venv;
+    # graceful timeout: an open SSE stream would otherwise block the reload forever
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app --timeout-graceful-shutdown 3
+    env_file: .env
     ports:
-      - "8000:8000"
+      # loopback only: until auth lands, anyone on the LAN could spend the LLM key
+      - "127.0.0.1:8000:8000"
     healthcheck:
       # the slim image has no curl, but python is always there
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -21,3 +25,5 @@ services:
         # rebuild: new dependencies = new image, syncing .venv makes no sense
         - action: rebuild
           path: ./services/harness/uv.lock
+        - action: rebuild
+          path: ./services/harness/pyproject.toml
