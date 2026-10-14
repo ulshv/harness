@@ -7,6 +7,8 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from app.agent.tools import TOOLS
 
 SYSTEM_PROMPT = "You are a concise assistant. Use tools when they help."
+# LangGraph 1.2 defaults to 10007 supersteps; a tool round is 2 (agent + tools): 25 allows 11 rounds + the answer
+RECURSION_LIMIT = 25
 
 
 def build_graph(model: BaseChatModel) -> CompiledStateGraph:
@@ -29,5 +31,6 @@ def build_graph(model: BaseChatModel) -> CompiledStateGraph:
     # tool_calls in the last AI message → "tools", otherwise → END; tools → agent closes the ReAct loop
     builder.add_conditional_edges("agent", tools_condition)
     builder.add_edge("tools", "agent")
-    # compile() validates the wiring and returns a runnable (invoke/astream); no checkpointer yet → no memory
-    return builder.compile()
+    # compile() validates the wiring and returns a runnable (invoke/astream); no checkpointer yet → no memory.
+    # with_config bakes the limit into every run; hitting it raises GraphRecursionError
+    return builder.compile().with_config(recursion_limit=RECURSION_LIMIT)

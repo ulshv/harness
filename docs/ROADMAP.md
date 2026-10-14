@@ -14,7 +14,7 @@ How this file is kept:
 | # | Step | Status |
 |---|---|---|
 | 0 | Skeleton: monorepo, `compose.yaml` with `develop.watch`, healthchecks, harness serves `/health` and reloads on file save | done: history 000 |
-| 1 | First agent: LangGraph agent with one tool, token streaming over SSE, verify with `curl -N` | done: history 001; extended in 002 (production layout) and 003 (`/chat/stream` + `/chat/invoke`, batching) |
+| 1 | First agent: LangGraph agent with one tool, token streaming over SSE, verify with `curl -N` | done: history 001; extended in 002 (production layout), 003 (`/chat/stream` + `/chat/invoke`, batching) and 004 (`error` / `done` events) |
 | 2 | React chat with streaming | — |
 | 3 | Memory: threads and Postgres checkpointer, conversation continues after a restart | — |
 | 4 | deepagents: planning, virtual FS, subagents; the agent's todo list visible in the UI | — |
@@ -28,18 +28,13 @@ How this file is kept:
 
 ## Next up (proposed, in suggested order)
 
-1. **`error` + `done` events in the stream.** Today the 200 and headers are already sent when the LLM or a
-   tool fails mid-run, or when `GraphRecursionError` hits, so the stream just ends. The client can't tell a
-   finished answer from a dead stream. Add typed `error` / `done` events (`done` can carry the same summary
-   as `/chat/invoke`), plus a test with a *streaming* fake model, which the suite still lacks.
-   *Source: history 002 and 003 debriefs.*
-2. **`reasoning` event.** DeepSeek v4.1 flash takes ~11.6 s to the first token, and `ChatOpenAI` drops its
+1. **`reasoning` event.** DeepSeek v4.1 flash takes ~11.6 s to the first token, and `ChatOpenAI` drops its
    reasoning, so the user stares at nothing. Stream reasoning as its own event. This is likely also the trigger
    for the batching timer upgrade (see the backlog).
    *Source: live measurement, spec 003.*
-3. **React chat (roadmap step 2).** The event contract is ready for a frontend: a discriminated `ChatEvent`
+2. **React chat (roadmap step 2).** The event contract is ready for a frontend: a discriminated `ChatEvent`
    union in OpenAPI, `id` / `tool_call_id` pairing, batched text.
-4. **Memory (roadmap step 3).** `thread_id` + checkpointer, so the agent remembers the conversation; start
+3. **Memory (roadmap step 3).** `thread_id` + checkpointer, so the agent remembers the conversation; start
    in memory, then Postgres.
 
 ## Backlog
@@ -53,3 +48,7 @@ How this file is kept:
 | `init: true` in compose | nothing reaps zombie processes | MCP stdio subprocesses (step 8) | history 000 |
 | `--timeout-graceful-shutdown` in the image `CMD` too | only the dev `command` has it; in prod an open SSE stream can delay shutdown | first prod-like deploy (step 10) | history 000 |
 | `TEXT_FLUSH_INTERVAL` in config | it's a constant now | when it needs tuning without a release | spec 003 |
+| Usage / cost in `done` | `done` is `{}`; `ChatOpenAI` turns `stream_usage` off for a custom `base_url`, and usage must be summed across all LLM calls in a run | cost visibility in the UI or admin | spec 004 |
+| `interrupt` terminal event | the root graph swallows `GraphInterrupt` and emits `__interrupt__` in `updates`, so a paused run ends with `done` | human-in-the-loop (with deepagents, step 4) | history 004 |
+| Error code for context overflow | `ContextOverflowError` is `internal` now; the user can't act on that | memory (step 3) makes long histories common | history 004 |
+| Streaming fake with tool calls | `StreamingFakeModel` streams text only, so tool-call chunk streaming (`tool_call_chunks`) is untested | big-argument tools (step 4) | history 004 |

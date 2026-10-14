@@ -21,10 +21,13 @@ POST /chat/stream                             POST /chat/invoke
   │                       ├─ yes → [tools] runs the tool → back to [agent]
   │                       └─ no  → END
   ▼                                             ▼
+  append_error_or_done ── api/chat/outcome.py: + done on success, exception → error
+  ▼                                             ▼
   batch_text_events(window=0.05)                batch_text_events(window=inf)
   │  api/chat/batching.py: merge adjacent TextEvents
   ▼                                             ▼
-  one SSE frame per event                       ChatResponse(events=[...]) → one JSON
+  one SSE frame per event                       200 ChatResponse(events=[..., done])
+                                                or 500 ErrorEvent
 ```
 
 Both routes share one pipeline. They differ only in the batching window and in how events are put on
@@ -35,12 +38,13 @@ the wire, so a test through `/invoke` checks the same mapping the UI gets throug
 | Stage | Module | In → out | Knows about |
 |---|---|---|---|
 | translate | `api/chat/stream.py` | LangGraph `astream` parts → `ChatEvent` | LangGraph, messages |
+| terminate | `api/chat/outcome.py` | `ChatEvent` → `ChatEvent` + `done` or `error` | exceptions, error codes |
 | batch | `api/chat/batching.py` | `ChatEvent` → `ChatEvent` (fewer `TextEvent`s) | time, `TextEvent` |
 | encode | `api/chat/chat.py` | `ChatEvent` → SSE frame / JSON | HTTP, SSE |
 
 Each stage is an async generator over the previous one, so they compose like pipes and each can be
-tested alone. `ChatEvent = TextEvent | ToolCallEvent | ToolResultEvent` (`api/chat/schemas.py`) is a
-discriminated union on `type`; OpenAPI shows it as a named `ChatEvent` schema with `discriminator.mapping`.
+tested alone. `ChatEvent = TextEvent | ToolCallEvent | ToolResultEvent | DoneEvent | ErrorEvent`
+(`api/chat/schemas.py`) is a discriminated union on `type`; OpenAPI shows it as a named `ChatEvent` schema with `discriminator.mapping`.
 
 ## Translate: graph parts → events
 
@@ -61,6 +65,32 @@ Two subtleties:
 - A node's output in `updates` isn't always `{"messages": [...]}`. It can be `None` (no writes), a list
   (several writes), a single message, or a service key like `__interrupt__`. `_written_messages`
   handles each shape with a flat `match`.
+
+## Terminate: `done` or `error`
+
+`append_error_or_done` passes events through and appends exactly one terminal event: `done` when the
+source ends, `error` when it raises. It sits **before** batching. Both terminal events are non-text, so
+batched text is flushed before them, and text that arrived before a failure still reaches the client.
+
+| Exception (most specific class wins, via the MRO) | `code` |
+|---|---|
+| `ModelRateLimitError` (429) | `llm_rate_limited` |
+| `ModelAPIError` (5xx), `ModelConnectionError`, `ModelTimeoutError` | `llm_unavailable` |
+| `GraphRecursionError` | `recursion_limit` |
+| anything else, including provider 4xx (bad key, unknown model, context overflow) | `internal` |
+
+The classes are langchain-core's provider-neutral errors; langchain-openai raises subclasses of them. Only
+what a retry can fix is `llm_*`.
+
+The client gets the code and a fixed message. The exception and traceback go to the log only
+(`logger.exception("chat run failed")`; with no logging config yet it goes through Python's
+`logging.lastResort` to stderr, with no level or time, until roadmap step 9). A cancelled run (client gone) raises `CancelledError`, a
+`BaseException`, so nothing is appended. A client should close its `EventSource` on `done` or `error`;
+otherwise the browser reconnects and starts the agent again.
+
+Limits of the guarantee: it covers the graph and the translator. An exception in batching or encoding
+still ends the stream without a terminal event. An interrupted run (`GraphInterrupt`, future
+human-in-the-loop) ends with `done` for now.
 
 ## Batch: fewer text frames
 
@@ -94,7 +124,13 @@ data: {"tool_call_id":"call_1","name":"current_time","content":"2026-10-14T16:07
 
 event: text
 data: {"text":"It's 16:07 UTC on Oct"}
+
+event: done
+data: {}
 ```
+
+On failure the stream ends with
+`event: error` / `data: {"code":"llm_unavailable","message":"The language model provider is unavailable. Try again later."}`.
 
 JSON (`/chat/invoke`): the same events with a `type` field, wrapped in an object so fields can be added
 later.
@@ -103,9 +139,14 @@ later.
 {"events": [
   {"type": "tool_call", "id": "call_1", "name": "current_time", "args": {}},
   {"type": "tool_result", "tool_call_id": "call_1", "name": "current_time", "content": "2026-…"},
-  {"type": "text", "text": "It's 16:07 UTC on October 14, 2026."}
+  {"type": "text", "text": "It's 16:07 UTC on October 14, 2026."},
+  {"type": "done"}
 ]}
 ```
+
+On failure `/chat/invoke` returns `500` with the `ErrorEvent` as the body:
+`{"type": "error", "code": "...", "message": "..."}`. `done` stays in the success body, so `/invoke`
+remains the exact merged form of the stream.
 
 `id` / `tool_call_id` let a client pair a call with its result.
 
@@ -121,6 +162,8 @@ later.
 4. **`compile()`** turns the description into a runnable (`invoke` / `astream`). One compiled graph
    serves all requests concurrently, because each `astream()` call carries its own run state. That's why
    it lives once in `app.state`. There is no checkpointer yet, so no memory between requests.
+   `with_config(recursion_limit=RECURSION_LIMIT)` (25 supersteps: 11 tool rounds plus the answer) caps a looping agent.
+   LangGraph 1.2's default is 10007.
 5. **`bind_tools`** only attaches the tools' JSON schemas to the request. The model *asks* for a call;
    the graph executes it.
 
@@ -138,10 +181,12 @@ later.
 1. `agent/graph.py`: the whole agent, about 30 lines.
 2. `api/chat/chat.py`: two routes, the pipeline in two lines each.
 3. `api/chat/stream.py`: how the graph's progress becomes events.
-4. `api/chat/batching.py`: one generator, about 15 lines.
-5. `api/chat/schemas.py`, `main.py`, `api/deps.py`: contracts and wiring.
-6. Tests: `tests/api/test_chat.py` runs the same flow with a scripted fake model ("call the tool", then
-   "answer"); `tests/api/chat/` covers the translator and batching alone.
+4. `api/chat/outcome.py`: the terminal events and the error table.
+5. `api/chat/batching.py`: one generator, about 15 lines.
+6. `api/chat/schemas.py`, `main.py`, `api/deps.py`: contracts and wiring.
+7. Tests: `tests/api/test_chat.py` runs the same flow with a scripted fake model ("call the tool", then
+   "answer") and a streaming fake that can fail mid-stream; `tests/api/chat/` covers translator, outcome
+   and batching alone.
 
 To watch it live, keep `make up` running, temporarily add `print(part)` inside the `chat_events` loop,
 and `curl -N` `/chat/stream`. The raw parts show up in the compose logs.
@@ -152,3 +197,5 @@ and `curl -N` `/chat/stream`. The raw parts show up in the compose logs.
    <details><summary>Answer</summary>After `tools` runs, the graph has nowhere to go and the run ends. The client gets `tool_call` and `tool_result` but no answer, because the model never sees the tool's result. `compile()` doesn't complain: a node without outgoing edges is a valid end of the run (verified on langgraph 1.2.15).</details>
 2. Why does `/chat/invoke` fold the event pipeline instead of calling `graph.ainvoke()` and reading the final state?
    <details><summary>Answer</summary>To keep one source of truth. With `ainvoke`, `/invoke` would bypass the translator and the streaming request to the provider, and a test through `/invoke` could pass while `/stream` is broken. Folding the same pipeline with `window=inf` makes `/invoke` the exact merged form of what `/stream` sends.</details>
+3. Why does `append_error_or_done` sit before `batch_text_events` and not after it?
+   <details><summary>Answer</summary>When the source raises, batching would propagate the exception and drop its buffered text. Placed before batching, the exception becomes an `ErrorEvent`, a non-text event, and batching flushes the buffered text before passing it on. The partial answer reaches the client, then `error`.</details>

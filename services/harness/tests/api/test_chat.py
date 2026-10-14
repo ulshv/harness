@@ -1,12 +1,29 @@
 import json
 
 import pytest
+from langchain_core.exceptions import ModelConnectionError
 from langchain_core.messages import AIMessage
 
-TOOL_THEN_ANSWER = [
-    AIMessage("", tool_calls=[{"name": "current_time", "args": {}, "id": "call_1"}]),
-    AIMessage("It is noon."),
-]
+from tests.conftest import StreamingFakeModel
+
+
+# fresh objects per call: add_messages sets `id` on the message in place, and the same object
+# added twice is *replaced* (same id), not appended, which would silently end the ReAct loop
+def call_tool() -> AIMessage:
+    return AIMessage(
+        "", tool_calls=[{"name": "current_time", "args": {}, "id": "call_1"}]
+    )
+
+
+def tool_then_answer() -> list[AIMessage]:
+    return [call_tool(), AIMessage("It is noon.")]
+
+
+PROVIDER_DOWN = ModelConnectionError("connection refused")
+LLM_UNAVAILABLE = {
+    "code": "llm_unavailable",
+    "message": "The language model provider is unavailable. Try again later.",
+}
 
 
 def sse_events(body: str) -> list[tuple[str, dict]]:
@@ -18,20 +35,25 @@ def sse_events(body: str) -> list[tuple[str, dict]]:
 
 
 def test_stream_tool_call_then_answer(make_client):
-    resp = make_client(TOOL_THEN_ANSWER).post("/chat/stream", json={"message": "time?"})
+    resp = make_client(tool_then_answer()).post(
+        "/chat/stream", json={"message": "time?"}
+    )
 
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/event-stream")
     events = sse_events(resp.text)
-    assert [name for name, _ in events] == ["tool_call", "tool_result", "text"]
+    assert [name for name, _ in events] == ["tool_call", "tool_result", "text", "done"]
     assert events[0][1] == {"id": "call_1", "name": "current_time", "args": {}}
     assert events[1][1]["tool_call_id"] == "call_1"
     assert events[2][1] == {"text": "It is noon."}
+    assert events[3][1] == {}
     assert all("type" not in data for _, data in events)
 
 
 def test_invoke_returns_the_whole_run(make_client):
-    resp = make_client(TOOL_THEN_ANSWER).post("/chat/invoke", json={"message": "time?"})
+    resp = make_client(tool_then_answer()).post(
+        "/chat/invoke", json={"message": "time?"}
+    )
 
     assert resp.status_code == 200
     events = resp.json()["events"]
@@ -40,6 +62,7 @@ def test_invoke_returns_the_whole_run(make_client):
         {"type": "tool_call", "id": "call_1", "name": "current_time", "args": {}},
         {"type": "tool_result", "tool_call_id": "call_1", "name": "current_time"},
         {"type": "text", "text": "It is noon."},
+        {"type": "done"},
     ]
 
 
@@ -48,7 +71,54 @@ def test_invoke_plain_answer(make_client):
         "/chat/invoke", json={"message": "hello"}
     )
 
-    assert resp.json() == {"events": [{"type": "text", "text": "Hi!"}]}
+    assert resp.json() == {
+        "events": [{"type": "text", "text": "Hi!"}, {"type": "done"}]
+    }
+
+
+def test_stream_delivers_buffered_text_before_the_error(make_client):
+    model = StreamingFakeModel(chunks=["Hel", "lo"], error=PROVIDER_DOWN)
+
+    resp = make_client(model).post("/chat/stream", json={"message": "hi"})
+
+    assert resp.status_code == 200
+    assert sse_events(resp.text) == [
+        ("text", {"text": "Hello"}),
+        ("error", LLM_UNAVAILABLE),
+    ]
+
+
+def test_stream_error_before_any_event(make_client):
+    model = StreamingFakeModel(chunks=[], error=PROVIDER_DOWN)
+
+    resp = make_client(model).post("/chat/stream", json={"message": "hi"})
+
+    assert resp.status_code == 200
+    assert sse_events(resp.text) == [("error", LLM_UNAVAILABLE)]
+
+
+def test_stream_reports_an_endless_tool_loop(make_client):
+    # more tool rounds than RECURSION_LIMIT=25 lets through (11 rounds + the answer)
+    endless = [call_tool() for _ in range(30)]
+
+    resp = make_client(endless).post("/chat/stream", json={"message": "loop"})
+
+    assert sse_events(resp.text)[-1] == (
+        "error",
+        {
+            "code": "recursion_limit",
+            "message": "The agent took too many steps without finishing.",
+        },
+    )
+
+
+def test_invoke_failure_is_500_with_the_error_event(make_client):
+    model = StreamingFakeModel(chunks=["Hel"], error=PROVIDER_DOWN)
+
+    resp = make_client(model).post("/chat/invoke", json={"message": "hi"})
+
+    assert resp.status_code == 500
+    assert resp.json() == {"type": "error", **LLM_UNAVAILABLE}
 
 
 @pytest.mark.parametrize("route", ["/chat/stream", "/chat/invoke"])
@@ -77,6 +147,12 @@ def test_invoke_schema_discriminates_events_by_type(make_client):
             "text": "#/components/schemas/TextEvent",
             "tool_call": "#/components/schemas/ToolCallEvent",
             "tool_result": "#/components/schemas/ToolResultEvent",
+            "done": "#/components/schemas/DoneEvent",
+            "error": "#/components/schemas/ErrorEvent",
         },
     }
     assert "type" in schemas["TextEvent"]["required"]
+    invoke = resp.json()["paths"]["/chat/invoke"]["post"]["responses"]
+    assert invoke["500"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorEvent"
+    }

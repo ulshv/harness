@@ -32,9 +32,26 @@ class ToolResultEvent(_Event):
     content: str
 
 
+# terminal events: every run ends with exactly one of these two
+class DoneEvent(_Event):
+    type: Literal["done"] = "done"
+
+
+type ErrorCode = Literal[
+    "llm_unavailable", "llm_rate_limited", "recursion_limit", "internal"
+]
+
+
+class ErrorEvent(_Event):
+    type: Literal["error"] = "error"
+    code: ErrorCode
+    message: str
+
+
 # discriminator → OpenAPI oneOf + mapping, so generated clients can narrow the union by `type`
 type ChatEvent = Annotated[
-    TextEvent | ToolCallEvent | ToolResultEvent, Field(discriminator="type")
+    TextEvent | ToolCallEvent | ToolResultEvent | DoneEvent | ErrorEvent,
+    Field(discriminator="type"),
 ]
 
 
