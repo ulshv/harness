@@ -79,6 +79,7 @@ moves very fast, so treat everything you remember from training as outdated unti
 | Python (image) | 3.14.8 (`python:3.14.8-slim`) | `services/harness/Dockerfile` |
 | uv | 0.11.22 | Dockerfile (`ghcr.io/astral-sh/uv`) |
 | FastAPI / uvicorn | 0.143.1 / 0.54.0 | `pyproject.toml` |
+| pydantic-settings | 2.16.0 | `pyproject.toml` (history 002) |
 | pytest / ruff / httpx2 | 9.1.1 / 0.17.0 / 2.13.1 | dev group |
 | langgraph | 1.2.15 | `pyproject.toml` (step 1) |
 | langchain-openai / langchain-core | 1.7.2 / 1.6.10 (transitive) | `pyproject.toml` (step 1) |
@@ -122,8 +123,14 @@ You're the master-partner. You write features, I read, tweak and sometimes take 
 
 ### Code
 
+- **Production code, not PoCs.** I've shipped a production harness on this stack and seen
+  tens of thousands of lines of spaghetti; don't grow another one. Layered layout from the start
+  (`app/api/<feature>/` thin routers + schemas, `app/agent/` graph/tools/llm, `app/settings.py`),
+  small single-purpose functions, dispatch (tables, `match`, `singledispatch`) instead of
+  nested `for/if/for/yield` pyramids, typed contracts (pydantic) at the edges, config validated at startup.
 - Write idiomatic and lean: set only what differs from defaults, no
-  "for the future" boilerplate. Minimal diffs; diff size matters to me.
+  "for the future" boilerplate. Lean ≠ hacky: structure is not boilerplate.
+  Minimal diffs; diff size matters to me.
 - **Teaching comments**: 1–2 short lines per concept, the "why" + a non-obvious fact.
   I've been writing Go/JS for a long time, don't explain language basics. Comment on what's new: advanced Python/Go,
   LangGraph (state, reducers, nodes/edges, checkpointer, interrupts), deepagents (planning,
@@ -179,6 +186,14 @@ You're the master-partner. You write features, I read, tweak and sometimes take 
   "how to verify", knobs, questions/answers (answers in `<details>`), "debrief: takeaways".
   It's a clean document, not a chat transcript.
 - After review, update the status, commit and takeaways.
+
+## Architecture docs
+
+- `docs/arch/NNN_<topic>.md`: how the system works (request flows, diagrams, concepts,
+  reading order), unlike `docs/history/`, which logs what each step changed.
+- Each doc is a snapshot of the code at a given step (named at the top). When a flow changes notably,
+  add a new `NNN_` doc rather than rewriting an old one; the highest number on a topic is current.
+- Read the relevant ones before changing a flow.
 
 ## Git
 

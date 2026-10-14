@@ -1,55 +1,36 @@
-from collections.abc import AsyncIterable
-from functools import cache
-from typing import Annotated
+from collections.abc import Callable
+from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
-from fastapi.sse import EventSourceResponse, ServerSentEvent
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from fastapi import FastAPI
 from langgraph.graph.state import CompiledStateGraph
-from pydantic import BaseModel
 
-from app.agent import build_graph, make_model
+from app.agent.graph import build_graph
+from app.agent.llm import make_model
+from app.api import health
+from app.api.chat import chat
+from app.settings import LLMSettings
 
-app = FastAPI(title="harness")
-
-
-# a cached dependency: the graph is built once on first request, and tests swap it via dependency_overrides
-@cache
-def get_graph():
-    return build_graph(make_model())
+type GraphFactory = Callable[[], CompiledStateGraph]
 
 
-class ChatRequest(BaseModel):
-    message: str
+def default_graph() -> CompiledStateGraph:
+    return build_graph(make_model(LLMSettings()))
 
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+# the factory parameter is the seam for tests: they pass a graph with a fake model
+def create_app(graph_factory: GraphFactory = default_graph) -> FastAPI:
+    # lifespan: code before `yield` runs at startup, after it at shutdown
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # built once at startup: a bad config fails the boot, not the first request
+        app.state.graph = graph_factory()
+        yield
+
+    app = FastAPI(title="harness", lifespan=lifespan)
+    app.include_router(health.router)
+    app.include_router(chat.router)
+    return app
 
 
-@app.post("/chat", response_class=EventSourceResponse)
-async def chat(
-    req: ChatRequest, graph: Annotated[CompiledStateGraph, Depends(get_graph)]
-) -> AsyncIterable[ServerSentEvent]:
-    inputs = {"messages": [HumanMessage(req.message)]}
-    # "messages" yields LLM tokens as they arrive, "updates" yields each node's finished output
-    async for mode, data in graph.astream(inputs, stream_mode=["messages", "updates"]):
-        if mode == "messages":
-            msg, _meta = data
-            if isinstance(msg, AIMessage) and msg.text:
-                yield ServerSentEvent(event="token", data={"text": msg.text})
-            continue
-        for update in data.values():
-            for msg in update["messages"]:
-                if isinstance(msg, AIMessage):
-                    for call in msg.tool_calls:
-                        yield ServerSentEvent(
-                            event="tool_call",
-                            data={"name": call["name"], "args": call["args"]},
-                        )
-                elif isinstance(msg, ToolMessage):
-                    yield ServerSentEvent(
-                        event="tool_result",
-                        data={"name": msg.name, "content": msg.content},
-                    )
+# uvicorn's target (`app.main:app`); importing it reads no LLM_* env, lifespan does at startup
+app = create_app()

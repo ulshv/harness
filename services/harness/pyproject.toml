@@ -6,6 +6,7 @@ dependencies = [
     "fastapi==0.143.1",
     "langchain-openai==1.7.2",
     "langgraph==1.2.15",
+    "pydantic-settings==2.16.0",
     "uvicorn[standard]==0.54.0",
 ]
 
@@ -19,3 +20,7 @@ dev = [
 [tool.pytest.ini_options]
 # app/ isn't installed as a package, so let pytest import it from the service root
 pythonpath = ["."]
+
+[tool.ruff.lint]
+# defaults (E, F) + import order, pyupgrade, bugbear, simplify
+extend-select = ["I", "UP", "B", "SIM"]
