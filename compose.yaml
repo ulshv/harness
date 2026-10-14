@@ -1,0 +1,23 @@
+services:
+  harness:
+    build: ./services/harness
+    # --reload is dev-only: the image's default CMD is the prod command without it
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    healthcheck:
+      # the slim image has no curl, but python is always there
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        # sync: copies files into the running container, uvicorn --reload notices the change
+        - action: sync
+          path: ./services/harness/app
+          target: /app/app
+        # rebuild: new dependencies = new image, syncing .venv makes no sense
+        - action: rebuild
+          path: ./services/harness/uv.lock

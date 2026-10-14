@@ -1,0 +1,19 @@
+[project]
+name = "harness"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi==0.143.1",
+    "uvicorn[standard]==0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2==2.13.1",
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+]
+
+[tool.pytest.ini_options]
+# app/ isn't installed as a package, so let pytest import it from the service root
+pythonpath = ["."]

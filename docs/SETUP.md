@@ -1,0 +1,43 @@
+# Environment setup
+
+## Step 0 (2026-10-14)
+
+Everything was already on the host, nothing to install:
+
+| Tool | Version | Why |
+|---|---|---|
+| docker / compose | 29.5.3 / v5.1.4 | containers and `up --watch` (needs compose ≥ 2.22) |
+| uv | 0.11.22 | Python dependencies and the lock file |
+| go | 1.26.2 | auth service (step 5) |
+| node / npm | 22.22.3 / 10.9.8 | web (step 2) |
+| python3 | 3.14.4 | local venv for tests; the container has its own 3.14.8 |
+
+Check:
+
+```bash
+docker compose version && uv --version && go version && node --version
+```
+
+### Local dev for harness
+
+```bash
+cd services/harness
+uv sync                 # .venv with the dev group (pytest, ruff, httpx2)
+uv run pytest -q
+uv run ruff check . && uv run ruff format --check .
+```
+
+### Library references
+
+Sources at pinned tags in `.reference/` (gitignored), shallow clones:
+
+```bash
+mkdir -p .reference && cd .reference
+git clone --depth 1 --branch 1.2.15 https://github.com/langchain-ai/langgraph
+git clone --depth 1 --branch deepagents==0.7.25 https://github.com/langchain-ai/deepagents
+git clone --depth 1 --branch langchain==1.4.5 https://github.com/langchain-ai/langchain
+git clone --depth 1 --branch langchain-mcp-adapters==0.3.2 https://github.com/langchain-ai/langchain-mcp-adapters
+git clone --depth 1 --branch 0.143.1 https://github.com/fastapi/fastapi
+```
+
+langchain-ai monorepos tag as `pkg==X.Y.Z`, langgraph as plain `X.Y.Z`.
