@@ -57,22 +57,13 @@ curl -s https://routerai.ru/api/v1/models | jq -r '.data[].id' | grep deepseek
 
 ## Architecture diagram (README)
 
-Source: `docs/imgs/architecture.mmd`, which is also copied into the Mermaid spoilers of `README.md` and
-`README-ru.md`; keep all three in sync (the diagram itself stays in English).
-The SVG is rendered with `mermaid-cli` and a local Chrome. Labels must be plain SVG text: with the default HTML labels
-(`<foreignObject>`), viewers that don't render HTML inside SVG (image viewers, librsvg, …) show empty boxes.
-In mermaid-cli 12, `htmlLabels` has to be set at the **root** of the config; `flowchart.htmlLabels` alone is ignored.
-A monospace stack is set explicitly: mermaid measures label widths with the render-time font, and mono fonts
-have near-identical widths (~0.6 em) across platforms. `wrappingWidth: 400` stops auto-wrapping, so lines
-break only at the `<br/>` in the source. Keep labels short: the README shows the SVG at ~880 px. The diagram is a `flowchart` laid out by dagre *from its edges*: describe the real
-relationships and let layers emerge from the flow; don't try to force rows inside subgraphs (dagre ignores or
-inverts nested `direction`). Node declaration order nudges left-to-right placement within a layer. Check with
-`grep -o '<foreignObject' docs/imgs/architecture.svg | wc -l`, which must print `0`.
+`docs/imgs/architecture.svg` is **hand-drawn**: explicit coordinates, orthogonal edges, plain SVG `<text>`
+(no `<foreignObject>`, so it renders in any viewer), and a monospace font stack. Edit it directly, and check the
+result in a browser inside an `<img>` at ~880 px wide, which is how GitHub shows it.
 
-```bash
-echo '{"executablePath":"/usr/bin/google-chrome","args":["--no-sandbox"]}' > /tmp/puppeteer.json
-F='ui-monospace, SFMono-Regular, Menlo, Consolas, DejaVu Sans Mono, Liberation Mono, monospace'
-echo "{\"htmlLabels\":false,\"fontFamily\":\"$F\",\"themeVariables\":{\"fontFamily\":\"$F\",\"fontSize\":\"16px\"},\"flowchart\":{\"htmlLabels\":false,\"wrappingWidth\":400}}" > /tmp/mermaid.json
-PUPPETEER_SKIP_DOWNLOAD=1 npx -y @mermaid-js/mermaid-cli@12.0.0 -p /tmp/puppeteer.json -c /tmp/mermaid.json \
-  -i docs/imgs/architecture.mmd -o docs/imgs/architecture.svg -b white
-```
+`docs/imgs/architecture.mmd` is the Mermaid version of the same diagram, copied into the spoilers of `README.md` and
+`README-ru.md` (GitHub renders it natively). It isn't the SVG's source. Keep the SVG, the `.mmd` and both README
+copies in sync by meaning when components change.
+
+Why not `mermaid-cli`: its dagre layout can't keep layers tidy as the diagram grows, and the default HTML labels
+(`<foreignObject>`) show up as empty boxes outside browsers.

@@ -27,12 +27,13 @@ suggested order.
 | 8 | External MCP from the admin panel: server registry, credentials, the agent sees and calls their tools | — |
 | 9 | Observability: agent traces (Langfuse / OpenTelemetry), logs with trace-id across all services | — |
 | 10 | Kubernetes: minikube/kind + Tilt, same services, same hot-reload | — |
-| 11 | Evals: a dataset of cases and agent quality regression | — |
+| 11 | Evals in Langfuse: datasets of cases (curated, plus harvested from production traces), experiment runs against the agent, LLM-as-judge and code scorers, a regression gate in CI | — |
 | 12 | Custom tools as plugins: tools packaged and registered without touching the agent core | — |
 | 13 | Dictionaries: per-environment values that skills reference by name. One skill (say "update the deal amount") works across environments where the same MCP server exposes different internals (`cf_12345` in one CRM, `UF_CRM_AMOUNT` in another) | — |
 | 14 | Multi-tenancy: tenant isolation for threads, skills, dictionaries, MCP credentials | — |
 | 15 | SSO / OAuth (OIDC) on top of the Go auth service | — |
 | 16 | Inbound integrations: external systems (CRM, messengers, internal services) authenticate to harness with OAuth 2.0 client credentials or scoped, per-tenant API keys (service tokens issued by auth), and trigger agent runs via `/webhooks/...` endpoints. Includes signature verification, idempotency keys, async runs with results delivered by callback or polling, and rate limits | — |
+| 17 | RAG: knowledge bases managed from the admin panel. Document ingestion (parsing, chunking, embeddings), pgvector in Postgres, hybrid search (vector + full-text), a retrieval tool for the agent, citations streamed to the chat, per-tenant isolation. Retrieval quality is measured with Langfuse evals | — |
 
 Distribution: open core. The foundation stays open source (Apache-2.0); some enterprise capabilities may
 ship separately.

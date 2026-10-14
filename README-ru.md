@@ -41,17 +41,20 @@
   JWKS, ротация refresh-токенов, httpOnly cookie, затем RBAC. Позже — multi-tenancy и SSO.
 - **Агенты, управляемые событиями.** Кроме чата, агента запускают внешние системы — CRM или мессенджер: они
   аутентифицируются по OAuth client credentials или API-ключам с ограниченными правами и вызывают вебхуки.
-- **Память, deep agents, наблюдаемость и evals.** Треды в Postgres, планирование и сабагенты, трейсы
-  через все сервисы и регрессионный набор для качества агента.
+- **RAG.** Базы знаний из админки: загрузка документов, pgvector в Postgres, гибридный поиск и ответы со
+  ссылками на источники. Для каждого тенанта своя.
+- **Память, deep agents, наблюдаемость и evals.** Треды в Postgres, планирование и сабагенты. Трейсы и evals —
+  в одном месте, в Langfuse: датасеты из реальных продовых трейсов, оценка LLM-as-judge и регрессионный
+  контроль качества агента.
 
 ## Архитектура
 
-<img src="./docs/imgs/architecture.svg" alt="Архитектура harness: клиенты (чат по SSE, админка по REST, внешние системы через вебхуки) вызывают API harness; чат идёт через конвейер событий, вебхуки запускают асинхронные прогоны; runtime агента использует тулзы, плагины, MCP-клиент, скиллы и справочники, память; LLM-провайдеры, MCP-серверы, Postgres, трейсы; сервис auth на Go выдаёт токены, которые проверяются через JWKS, и поддерживает SSO" />
+<img src="./docs/imgs/architecture.svg" alt="Архитектура harness: клиенты (чат по SSE, админка по REST, внешние системы через вебхуки) вызывают API harness; чат идёт через конвейер событий, вебхуки запускают асинхронные прогоны; runtime агента использует тулзы, плагины, MCP-клиент, скиллы и справочники, память и базу знаний RAG; LLM-провайдеры, MCP-серверы, Postgres с pgvector, Langfuse для трейсов и evals; сервис auth на Go выдаёт токены и публикует JWKS-ключи для harness, поддерживает SSO" />
 
 Сплошная зелёная рамка — сделано. Пунктир — в планах.
 
 <details>
-<summary>Исходник на Mermaid</summary>
+<summary>Mermaid-версия</summary>
 
 ```mermaid
 flowchart TB
@@ -72,45 +75,49 @@ flowchart TB
         mcp_client["MCP<br/>client"]
         skills["Skills<br/>Dictionaries"]
         memory["Memory<br/>checkpoints"]
+        rag["Knowledge<br/>RAG"]
     end
 
     subgraph auth_box["auth · Go"]
-        auth["JWT + JWKS<br/>RBAC · SSO"]
+        auth["JWT + JWKS · RBAC<br/>service tokens · SSO"]
     end
 
     llm[("LLM<br/>providers")]
     mcp[("MCP<br/>servers")]
-    pg[("Postgres")]
+    pg[("Postgres<br/>pgvector")]
     idp[("Identity<br/>provider")]
-    obs[("Traces<br/>Langfuse")]
+    obs[("Langfuse<br/>traces · evals")]
 
     chat_ui -- "SSE" --> chat_api
     admin_ui -- "REST" --> admin_api
     ext_sys -- "webhooks · callbacks" --> hooks
     clients -- "login · OAuth" --> auth_box
-    harness -. "JWKS" .-> auth_box
+    auth_box -. "JWKS keys" .-> harness
 
     chat_api --> pipeline --> agent
     hooks -- "async run" --> agent
     admin_api --> skills
+    admin_api -- "ingest" --> rag
     agent --> tools
     agent --> plugins
     agent --> mcp_client
     agent --> skills
     agent --> memory
+    agent --> rag
 
     agent --> llm
     mcp_client --> mcp
     skills --> pg
     memory --> pg
+    rag --> pg
     auth_box --> pg
     auth_box --> idp
-    agent -. "traces" .-> obs
+    agent -. "traces · scores" .-> obs
 
     classDef shipped fill:#e8f5e9,stroke:#2e7d32,color:#1b1b1b
     classDef planned fill:#fafafa,stroke:#9e9e9e,stroke-dasharray:5 4,color:#424242
     class chat_api,pipeline,agent,tools,llm shipped
-    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,mcp_client,memory,auth,mcp,pg,idp,obs planned
+    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,mcp_client,memory,rag,auth,mcp,pg,idp,obs planned
     style clients fill:#ffffff,stroke:#bdbdbd
     style harness fill:#ffffff,stroke:#bdbdbd
     style auth_box fill:#ffffff,stroke:#bdbdbd
@@ -149,8 +156,9 @@ flowchart TB
 - [ ] Кастомные тулзы как плагины
 - [ ] Внешние MCP-интеграции: реестр серверов, креды
 - [ ] Справочники: переносимые скиллы со значениями под каждое окружение
-- [ ] Наблюдаемость: трейсы агента, trace-id через все сервисы
-- [ ] Evals: регрессионный набор для качества агента
+- [ ] RAG: базы знаний, pgvector, гибридный поиск, ссылки на источники в чате
+- [ ] Наблюдаемость: трейсы агента в Langfuse, trace-id через все сервисы
+- [ ] Evals в Langfuse: датасеты из продовых трейсов, LLM-as-judge, регрессионный контроль в CI
 - [ ] Multi-tenancy
 
 **Позже**

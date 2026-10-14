@@ -42,17 +42,20 @@ line and rework it until it meets clean-code standards.
   refresh-token rotation, httpOnly cookies, then RBAC. Multi-tenancy and SSO come later.
 - **Event-driven agents.** Beyond chat, external systems such as a CRM or a messenger authenticate with OAuth
   client credentials or scoped API keys and trigger the agent through webhook endpoints.
-- **Memory, deep agents, observability and evals.** Threads in Postgres, planning and subagents, traces
-  across services, and a regression suite for agent quality.
+- **RAG.** Knowledge bases managed from the admin panel: ingestion, pgvector in Postgres, hybrid search, and
+  answers with citations. Per tenant.
+- **Memory, deep agents, observability and evals.** Threads in Postgres, planning and subagents. Traces and
+  evals live in one place, Langfuse: datasets built from real production traces, LLM-as-judge scoring, and a
+  regression gate for agent quality.
 
 ## Architecture
 
-<img src="./docs/imgs/architecture.svg" alt="harness architecture: clients (chat UI over SSE, admin panel over REST, external systems over webhooks) call harness APIs; chat goes through the event pipeline, webhooks start async runs; the agent runtime uses tools, plugins, MCP client, skills and dictionaries, memory; LLM providers, MCP servers, Postgres, traces; Go auth service issues tokens verified via JWKS, with SSO" />
+<img src="./docs/imgs/architecture.svg" alt="harness architecture: clients (chat UI over SSE, admin panel over REST, external systems over webhooks) call harness APIs; chat goes through the event pipeline, webhooks start async runs; the agent runtime uses tools, plugins, MCP client, skills and dictionaries, memory and a RAG knowledge base; LLM providers, MCP servers, Postgres with pgvector, Langfuse for traces and evals; the Go auth service issues tokens and publishes JWKS keys to harness, with SSO" />
 
 Solid green: shipped. Dashed: planned.
 
 <details>
-<summary>Mermaid source</summary>
+<summary>Mermaid version</summary>
 
 ```mermaid
 flowchart TB
@@ -73,45 +76,49 @@ flowchart TB
         mcp_client["MCP<br/>client"]
         skills["Skills<br/>Dictionaries"]
         memory["Memory<br/>checkpoints"]
+        rag["Knowledge<br/>RAG"]
     end
 
     subgraph auth_box["auth · Go"]
-        auth["JWT + JWKS<br/>RBAC · SSO"]
+        auth["JWT + JWKS · RBAC<br/>service tokens · SSO"]
     end
 
     llm[("LLM<br/>providers")]
     mcp[("MCP<br/>servers")]
-    pg[("Postgres")]
+    pg[("Postgres<br/>pgvector")]
     idp[("Identity<br/>provider")]
-    obs[("Traces<br/>Langfuse")]
+    obs[("Langfuse<br/>traces · evals")]
 
     chat_ui -- "SSE" --> chat_api
     admin_ui -- "REST" --> admin_api
     ext_sys -- "webhooks · callbacks" --> hooks
     clients -- "login · OAuth" --> auth_box
-    harness -. "JWKS" .-> auth_box
+    auth_box -. "JWKS keys" .-> harness
 
     chat_api --> pipeline --> agent
     hooks -- "async run" --> agent
     admin_api --> skills
+    admin_api -- "ingest" --> rag
     agent --> tools
     agent --> plugins
     agent --> mcp_client
     agent --> skills
     agent --> memory
+    agent --> rag
 
     agent --> llm
     mcp_client --> mcp
     skills --> pg
     memory --> pg
+    rag --> pg
     auth_box --> pg
     auth_box --> idp
-    agent -. "traces" .-> obs
+    agent -. "traces · scores" .-> obs
 
     classDef shipped fill:#e8f5e9,stroke:#2e7d32,color:#1b1b1b
     classDef planned fill:#fafafa,stroke:#9e9e9e,stroke-dasharray:5 4,color:#424242
     class chat_api,pipeline,agent,tools,llm shipped
-    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,mcp_client,memory,auth,mcp,pg,idp,obs planned
+    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,mcp_client,memory,rag,auth,mcp,pg,idp,obs planned
     style clients fill:#ffffff,stroke:#bdbdbd
     style harness fill:#ffffff,stroke:#bdbdbd
     style auth_box fill:#ffffff,stroke:#bdbdbd
@@ -150,8 +157,9 @@ A deeper walkthrough is in [`docs/arch/001_chat-request-flow.md`](docs/arch/001_
 - [ ] Custom tools as plugins
 - [ ] External MCP integrations: server registry, credentials
 - [ ] Dictionaries: portable skills with per-environment values
-- [ ] Observability: agent traces, trace-id across services
-- [ ] Evals: agent quality regression suite
+- [ ] RAG: knowledge bases, pgvector, hybrid search, citations in the chat
+- [ ] Observability: agent traces in Langfuse, trace-id across services
+- [ ] Evals in Langfuse: datasets from production traces, LLM-as-judge, a regression gate in CI
 - [ ] Multi-tenancy
 
 **Later**

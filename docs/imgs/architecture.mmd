@@ -16,45 +16,49 @@ flowchart TB
         mcp_client["MCP<br/>client"]
         skills["Skills<br/>Dictionaries"]
         memory["Memory<br/>checkpoints"]
+        rag["Knowledge<br/>RAG"]
     end
 
     subgraph auth_box["auth · Go"]
-        auth["JWT + JWKS<br/>RBAC · SSO"]
+        auth["JWT + JWKS · RBAC<br/>service tokens · SSO"]
     end
 
     llm[("LLM<br/>providers")]
     mcp[("MCP<br/>servers")]
-    pg[("Postgres")]
+    pg[("Postgres<br/>pgvector")]
     idp[("Identity<br/>provider")]
-    obs[("Traces<br/>Langfuse")]
+    obs[("Langfuse<br/>traces · evals")]
 
     chat_ui -- "SSE" --> chat_api
     admin_ui -- "REST" --> admin_api
     ext_sys -- "webhooks · callbacks" --> hooks
     clients -- "login · OAuth" --> auth_box
-    harness -. "JWKS" .-> auth_box
+    auth_box -. "JWKS keys" .-> harness
 
     chat_api --> pipeline --> agent
     hooks -- "async run" --> agent
     admin_api --> skills
+    admin_api -- "ingest" --> rag
     agent --> tools
     agent --> plugins
     agent --> mcp_client
     agent --> skills
     agent --> memory
+    agent --> rag
 
     agent --> llm
     mcp_client --> mcp
     skills --> pg
     memory --> pg
+    rag --> pg
     auth_box --> pg
     auth_box --> idp
-    agent -. "traces" .-> obs
+    agent -. "traces · scores" .-> obs
 
     classDef shipped fill:#e8f5e9,stroke:#2e7d32,color:#1b1b1b
     classDef planned fill:#fafafa,stroke:#9e9e9e,stroke-dasharray:5 4,color:#424242
     class chat_api,pipeline,agent,tools,llm shipped
-    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,mcp_client,memory,auth,mcp,pg,idp,obs planned
+    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,mcp_client,memory,rag,auth,mcp,pg,idp,obs planned
     style clients fill:#ffffff,stroke:#bdbdbd
     style harness fill:#ffffff,stroke:#bdbdbd
     style auth_box fill:#ffffff,stroke:#bdbdbd
