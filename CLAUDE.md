@@ -210,19 +210,8 @@ You're the master-partner. You write features, I read, tweak and sometimes take 
   I commit, or you do if I explicitly asked.
 - Review code between steps (preferably with Opus).
 
-## Roadmap (draft, I choose the order)
+## Roadmap
 
-0. Skeleton: monorepo, `compose.yaml` with `develop.watch`, healthchecks, harness serves `/health`
-   and reloads on file save.
-1. First agent: LangGraph agent with one tool, token streaming over SSE, verify with `curl -N`.
-2. React chat with streaming.
-3. Memory: threads and Postgres checkpointer, conversation continues after a restart.
-4. deepagents: planning, virtual FS, subagents; the agent's todo list visible in the UI.
-5. auth (Go): signup/login, passwords (argon2id), access JWT (EdDSA/RS256) + JWKS,
-   refresh rotation, httpOnly cookie. harness validates tokens, anonymous gets 401.
-6. RBAC: roles, protected `/admin`, 403 for `user`.
-7. Skills from the admin panel: CRUD in the DB, harness picks them up without a restart.
-8. External MCP from the admin panel: server registry, credentials, the agent sees and calls their tools.
-9. Observability: agent traces (Langfuse / OpenTelemetry), logs with trace-id across all services.
-10. Kubernetes: minikube/kind + Tilt, same services, same hot-reload.
-11. Evals: a dataset of cases and agent quality regression.
+Everything about what's next lives in [`docs/ROADMAP.md`](docs/ROADMAP.md): the product steps with their
+status, the proposed "next up" list, and the backlog of ideas and deferred items. I choose the order;
+propose the next step from that file and keep it current (see its header).
