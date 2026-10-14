@@ -187,12 +187,21 @@ You're the master-partner. You write features, I read, tweak and sometimes take 
   It's a clean document, not a chat transcript.
 - After review, update the status, commit and takeaways.
 
+## Specs
+
+- `docs/specs/NNN_<topic>.md`: written **before** code for any non-trivial step. It covers the problem
+  (with measured numbers), goals and non-goals, the API contract, the design and its trade-offs, the files
+  touched, the tests, how to verify, and a decisions table. NNN matches the `docs/history/NNN.md` step
+  that implements it.
+- Status goes draft → approved → implemented. Code starts only after I approve the spec. If the
+  implementation deviates, update the spec as well.
+
 ## Architecture docs
 
-- `docs/arch/NNN_<topic>.md`: how the system works (request flows, diagrams, concepts,
+- `docs/arch/NNN_<topic>.md`: how the system works **as it is now** (request flows, diagrams, concepts,
   reading order), unlike `docs/history/`, which logs what each step changed.
-- Each doc is a snapshot of the code at a given step (named at the top). When a flow changes notably,
-  add a new `NNN_` doc rather than rewriting an old one; the highest number on a topic is current.
+- One doc per topic, updated in place in the same diff as the code that changes the flow. NNN only orders
+  topics; it is not a version. Old states live in git and `docs/history/`.
 - Read the relevant ones before changing a flow.
 
 ## Git

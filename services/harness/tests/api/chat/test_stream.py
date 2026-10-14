@@ -1,7 +1,7 @@
 import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 
-from app.api.chat.schemas import ToolCall, ToolResult
+from app.api.chat.schemas import ToolCallEvent, ToolResultEvent
 from app.api.chat.stream import _from_updates
 
 CALL = AIMessage("", tool_calls=[{"name": "current_time", "args": {}, "id": "c1"}])
@@ -28,6 +28,6 @@ def test_updates_with_messages_in_every_shape():
     }
 
     assert list(_from_updates(data)) == [
-        ToolCall(id="c1", name="current_time", args={}),
-        ToolResult(tool_call_id="c1", name="current_time", content="12:00"),
+        ToolCallEvent(id="c1", name="current_time", args={}),
+        ToolResultEvent(tool_call_id="c1", name="current_time", content="12:00"),
     ]

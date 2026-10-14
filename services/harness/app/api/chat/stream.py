@@ -5,15 +5,16 @@ from functools import singledispatch
 from itertools import chain
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.graph.state import CompiledStateGraph
 
-from app.api.chat.schemas import ChatEvent, Token, ToolCall, ToolResult
+from app.api.chat.schemas import ChatEvent, TextEvent, ToolCallEvent, ToolResultEvent
 
 
 async def chat_events(
-    graph: CompiledStateGraph, inputs: dict[str, Any]
+    graph: CompiledStateGraph, message: str
 ) -> AsyncIterator[ChatEvent]:
+    inputs = {"messages": [HumanMessage(message)]}
     # "messages" = LLM tokens as they arrive, "updates" = each node's finished output;
     # version="v2" yields typed parts {"type": <mode>, "ns": ..., "data": ...}
     async for part in graph.astream(
@@ -26,9 +27,9 @@ async def chat_events(
 # "messages" part data: (chunk, metadata); metadata says which node produced it (langgraph_node, langgraph_step)
 def _from_tokens(data: tuple[BaseMessage, dict[str, Any]]) -> Iterable[ChatEvent]:
     msg, _metadata = data
-    # "messages" also replays finished ToolMessages; only AI text counts as a token
+    # "messages" also replays finished ToolMessages; only AI text becomes a TextEvent
     if isinstance(msg, AIMessage) and msg.text:
-        yield Token(text=msg.text)
+        yield TextEvent(text=msg.text)
 
 
 # "updates" part data: {node_name: what that node returned}, e.g. {"tools": {"messages": [ToolMessage]}}
@@ -57,17 +58,20 @@ def _from_message(msg: BaseMessage) -> Iterable[ChatEvent]:
     return ()
 
 
-# the finished AI message: its text already went out as tokens, so only tool calls are new here
+# the finished AI message: its text already went out as TextEvents, so only tool calls are new here
 @_from_message.register
 def _(msg: AIMessage) -> Iterable[ChatEvent]:
     return (
-        ToolCall(id=c["id"], name=c["name"], args=c["args"]) for c in msg.tool_calls
+        ToolCallEvent(id=c["id"], name=c["name"], args=c["args"])
+        for c in msg.tool_calls
     )
 
 
 @_from_message.register
 def _(msg: ToolMessage) -> Iterable[ChatEvent]:
-    return (ToolResult(tool_call_id=msg.tool_call_id, name=msg.name, content=msg.text),)
+    return (
+        ToolResultEvent(tool_call_id=msg.tool_call_id, name=msg.name, content=msg.text),
+    )
 
 
 _BY_MODE: dict[str, Callable[[Any], Iterable[ChatEvent]]] = {
