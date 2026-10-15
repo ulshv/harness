@@ -4,10 +4,13 @@
 up:
 	docker compose up --watch
 
+SERVICES := harness testing-wms
+
 test:
-	uv run --directory services/harness pytest -q
+	for s in $(SERVICES); do uv run --directory services/$$s pytest -q || exit 1; done
 
 # check only, no rewrites: lint rules + formatting drift (fix with `ruff check --fix` / `ruff format`)
 lint:
-	uv run --directory services/harness ruff check .
-	uv run --directory services/harness ruff format --check .
+	for s in $(SERVICES); do \
+		uv run --directory services/$$s ruff check . && uv run --directory services/$$s ruff format --check . || exit 1; \
+	done

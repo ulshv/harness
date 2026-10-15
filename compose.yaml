@@ -27,3 +27,27 @@ services:
           path: ./services/harness/uv.lock
         - action: rebuild
           path: ./services/harness/pyproject.toml
+
+  # warehouse API for evals (spec 006): in-memory store, reset via POST /_reset
+  testing-wms:
+    build: ./services/testing-wms
+    # no --workers: the store lives in process memory; any .py reload resets it to the seed
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload --reload-dir app
+    ports:
+      - "127.0.0.1:8100:8100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        # seed.jsonc is synced too, but only .py edits reload; POST /_reset rereads the seed
+        - action: sync
+          path: ./services/testing-wms/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing-wms/uv.lock
+        - action: rebuild
+          path: ./services/testing-wms/pyproject.toml

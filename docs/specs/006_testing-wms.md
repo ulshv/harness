@@ -1,6 +1,6 @@
 # 006. Spec: `testing-wms`, a warehouse API for evals
 
-**Status:** draft
+**Status:** implemented (2026-10-15)
 **Implements in:** `docs/history/006.md`
 
 ## Problem
@@ -39,7 +39,7 @@ This is step 1 of 4:
 |---|---|
 | SKU | a product (`GLV-NIT-L`, "Nitrile gloves, size L") |
 | location | a storage slot, `zone-aisle-shelf` (`A-01-02`); it can be empty |
-| stock | `on_hand` of a SKU at a location; `reserved` of it is held for orders; `available = on_hand - reserved` |
+| stock | `on_hand` of a SKU at a location; `reserved` of it is held for orders (the sum of order allocations there, not stored); `available = on_hand - reserved` |
 | order | lines `sku × qty`; status `new`, `partially_reserved`, `reserved`, `shipped` or `cancelled` |
 | allocation | which location a line's reservation sits in: `{location, qty}`; a line's `reserved` is their sum, so cancel knows what to release where |
 
@@ -59,7 +59,7 @@ Errors use FastAPI's `{"detail": "<human-readable reason>"}`. The text matters: 
 | `POST /orders/{id}/cancel` | releases its allocations, status `cancelled`; works for `new`, `partially_reserved`, `reserved` | 404; 409 if `shipped`/`cancelled` |
 | `POST /moves` | `{sku, from_location, to_location, qty}`: moves available stock | 422 if `qty < 1` or `from == to` (body validation runs first); 404 unknown SKU/location; 409 if `qty` exceeds `available` at the source (no stock row there = 0 available) |
 | `POST /_reset` | reloads `seed.jsonc`; returns `/_state` | |
-| `GET /_state` | the raw store, in the same shape as `seed.jsonc` (one pydantic `Store` model for both); no computed `reserved` / `available` | |
+| `GET /_state` | the store, in the same shape as `seed.jsonc` (one pydantic `Store` model for both), plus each line's computed `reserved` | |
 
 **Reserve.** For each line, reserve `min(still needed, available)`, taking locations in ascending id order
 (deterministic, so evals can assert exact state). All lines covered → `reserved`; some → `partially_reserved`;
@@ -80,7 +80,7 @@ location creates its stock row.
 
 ## Seed data and its traps
 
-| SKU | Name | Stock: location on_hand/reserved |
+| SKU | Name | Stock: location on_hand/reserved (reserved comes from order 1002) |
 |---|---|---|
 | `GLV-NIT-L` | Nitrile gloves, size L | `A-01-02` 120/40, `A-02-01` 30/0, `B-01-01` 50/50 |
 | `GLV-NIT-XL` | Nitrile gloves, size XL | `A-01-01` 60/0 |
@@ -113,8 +113,8 @@ Locations are listed explicitly in the seeds: the seven above plus two empty one
 | failing tool | `GET /stock/SCN-01` → 503; its stock is still visible via `/locations`, a legitimate recovery path for step 009 to allow |
 | empty vs unknown location | `D-01-01` exists and is empty; `D-09-09` doesn't exist → 404 |
 
-The seeds are consistent: `reserved` at each SKU and location equals the sum of order allocations there. A test
-checks this.
+Reserved stock isn't stored, so it can't disagree with the orders *(changed during implementation)*. A test checks
+that allocations point at existing stock rows and never exceed `on_hand`.
 
 ## Design
 
@@ -126,7 +126,8 @@ checks this.
   store at once. Async handlers run on the event loop's single thread, and the store has no `await` inside, so no locks.
   This needs **one uvicorn worker**: with several, each process has its own store and `/_reset` hits only one.
 - A `--reload` (any `.py` edit) wipes state back to the seeds. Editing `seed.jsonc` doesn't reload; `/_reset` picks it up.
-- `store.py` raises domain errors (`NotFound`, `Conflict`); `api.py` maps them to 404/409 with one exception handler each.
+- `store.py` raises domain errors (`NotFound`, `Conflict`, `Unavailable`); `api.py` maps them to 404/409/503 with one
+  handler on their base class and a status table *(changed during implementation)*.
 - Compose: service `testing-wms` on `127.0.0.1:8100`, always started, hot reload and healthcheck like harness.
 - Same pinned FastAPI / uvicorn / pydantic as harness, plus `json5` (pinned at implementation); separate
   `pyproject.toml` and `uv.lock`.
@@ -145,7 +146,7 @@ checks this.
 
 Expected values are literals.
 
-- Seeds: reserved stock at each SKU and location matches the order allocations; every stock location is in the location list.
+- Seeds: allocations point at existing stock rows, reserved never exceeds `on_hand`, every stock location is in the location list.
 - Reserve: 1001 → `reserved`, stock `GLV-NIT-XL` `A-01-01` reserved 20; 1003 → `partially_reserved`, shortage
   `TAPE-48` 5, all 50 × `GLV-NIT-L` from `A-01-02` (first in id order, reserved 40 → 90); 999 → 409.
   Nothing available → 409 and the order unchanged: a `store.py` test with its own small data, since the seeds have
@@ -184,3 +185,4 @@ make test && make lint
 | Auth | none | credentials belong to step 008; backlog |
 | Layout | flat `app/api.py`, not `app/api/<feature>/` | a test double with one feature; CLAUDE.md's layout is for the product services |
 | Line allocations | stored per line, `reserved` is their sum *(added after review)* | cancel must know which locations to release; prose in the seeds isn't a data model |
+| Reserved stock *(changed during implementation)* | derived from allocations, not stored on stock rows | one source of truth: reserve and cancel only touch allocations, and the seed-consistency check that the first draft needed disappears. `/_state` shows the line's computed `reserved`, a `computed_field` |
