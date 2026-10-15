@@ -1,6 +1,6 @@
 # 007. Spec: `testing-wms-mcp`, an MCP server over the warehouse API
 
-**Status:** draft
+**Status:** implemented (2026-10-15)
 **Implements in:** `docs/history/007.md`
 
 ## Problem
@@ -74,8 +74,9 @@ no result at all) isn't used: every warehouse failure is something the model can
   - `app/server.py`: `MCPServer("testing-wms")` and the eight tools;
   - `app/wms.py`: one function that calls the API and turns failures into `ToolError`;
   - `app/settings.py`: `WMS_URL` (pydantic-settings, fails at startup if missing);
-  - `app/main.py`: `app = server.streamable_http_app(...)` plus `GET /health` via `custom_route`, so uvicorn
-    runs it with `--reload` like the others.
+  - `app/main.py`: `create_app()` returns `server.streamable_http_app(...)` plus `GET /health` via `custom_route`;
+    uvicorn runs it with `--factory` and `--reload`. *(Changed during implementation: no module-level `app`, so
+    importing the module reads no env and tests need no `WMS_URL`.)*
 - **Transport:** Streamable HTTP at `/mcp`, `stateless_http=True`: no sessions for 2025-era clients either. Each
   call is one request to the API; there is nothing to keep between calls.
 - **Host allowlist.** Without `transport_security`, `streamable_http_app()` assumes localhost and rejects any other
@@ -88,7 +89,9 @@ no result at all) isn't used: every warehouse failure is something the model can
   call. `/health` isn't behind the Host check.
 - **HTTP client:** `httpx2` (the SDK already depends on it), a new `AsyncClient` per call with a 10 s timeout
   constant. A pooled client would need a lifespan hook; for a test double one connection per call is fine. The
-  client's transport is a module-level seam in `wms.py` that tests replace with `httpx2.MockTransport`.
+  seam for tests is a `Wms(base_url, transport)` object passed to `build_server(wms)`; the tools close over it, and
+  tests pass `httpx2.MockTransport`. *(Changed during implementation: an injected object instead of a module-level
+  global that tests patch.)*
 - `app/main.py` has a `create_app()` factory: a session manager can `run()` only once, so each HTTP-level test
   builds its own app.
 - Compose: `testing-wms-mcp` on `127.0.0.1:8101`, `WMS_URL=http://testing-wms:8100`, `depends_on` testing-wms

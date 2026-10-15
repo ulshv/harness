@@ -27,6 +27,17 @@ uv run pytest -q
 uv run ruff check . && uv run ruff format --check . && uv run basedpyright
 ```
 
+### MCP Inspector
+
+The official UI for poking an MCP server: lists its tools with descriptions and calls them by hand. Needs Node.
+
+```bash
+npx @modelcontextprotocol/inspector   # transport "Streamable HTTP", URL http://localhost:8101/mcp
+```
+
+It runs in proxy mode by default: the browser talks to a local proxy, and the proxy calls the server, so the
+server's Host/Origin allowlist (`localhost:*`) is enough.
+
 ### Library references
 
 Sources at pinned tags in `.reference/` (gitignored), shallow clones:

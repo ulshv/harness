@@ -41,7 +41,7 @@ ship separately.
 ## Next up (proposed, in suggested order)
 
 0. **Testing MCP and evals (branch `feat/testing-mcp`, then `feat/evals`).** 006 `testing-wms` (done), 007
-   `testing-wms-mcp`, 008 MCP client in harness (a first slice of step 8), 009 evals (a first slice of step 11).
+   `testing-wms-mcp` (done), 008 MCP client in harness (a first slice of step 8), 009 evals (a first slice of step 11).
 1. **React chat (roadmap step 2).** The event contract is ready for a frontend: a discriminated `ChatEvent`
    union in OpenAPI, `id` / `tool_call_id` pairing, batched text, `reasoning` for a spoiler, `done` / `error`.
 2. **Memory (roadmap step 3).** `thread_id` + checkpointer, so the agent remembers the conversation; start
@@ -65,3 +65,4 @@ ship separately.
 | Error code for context overflow | `ContextOverflowError` is `internal` now; the user can't act on that | memory (step 3) makes long histories common | history 004 |
 | Streaming fake with tool calls | `StreamingFakeModel` streams text only, so tool-call chunk streaming (`tool_call_chunks`) is untested | big-argument tools (step 4) | history 004 |
 | API key on `testing-wms` | the test API is open; real MCP integrations carry credentials | MCP credentials in harness (step 8) | spec 006 |
+| harness on `mcp` 2 | harness's MCP client is `mcp` 1.x because `langchain-mcp-adapters` 0.3.2 requires `mcp<2`; the server side is already 2.3.0 | when the adapters support `mcp` 2 | spec 007 |

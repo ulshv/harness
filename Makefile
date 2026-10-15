@@ -4,7 +4,7 @@
 up:
 	docker compose up --watch
 
-SERVICES := harness testing-wms
+SERVICES := harness testing-wms testing-wms-mcp
 
 test:
 	for s in $(SERVICES); do uv run --directory services/$$s pytest -q || exit 1; done
