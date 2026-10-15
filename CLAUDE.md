@@ -127,8 +127,10 @@ You're the master-partner. You write features, I read, tweak and sometimes take 
 - **Production code, not PoCs.** I've shipped a production harness on this stack and seen
   tens of thousands of lines of spaghetti; don't grow another one. Layered layout from the start
   (`app/api/<feature>/` thin routers + schemas, `app/agent/` graph/tools/llm, `app/settings.py`),
-  small single-purpose functions, dispatch (tables, `match`, `singledispatch`) instead of
-  nested `for/if/for/yield` pyramids, typed contracts (pydantic) at the edges, config validated at startup.
+  small single-purpose functions, dispatch (`match` first; a table when the mapping is data,
+  `singledispatch` for open type hierarchies) instead of nested `for/if/for/yield` pyramids; don't mix
+  mechanisms for the same kind of decision (two plain `for` levels with `yield from` are fine), typed
+  contracts (pydantic) at the edges, config validated at startup.
 - Write idiomatic and lean: set only what differs from defaults, no
   "for the future" boilerplate. Lean ≠ hacky: structure is not boilerplate.
   Minimal diffs; diff size matters to me.
