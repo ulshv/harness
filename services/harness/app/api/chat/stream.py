@@ -1,8 +1,6 @@
 """Translates a LangGraph run into chat events. Knows nothing about HTTP or SSE."""
 
-from collections.abc import AsyncIterator, Callable, Iterable
-from functools import singledispatch
-from itertools import chain
+from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
@@ -21,8 +19,8 @@ async def chat_events(
     graph: CompiledStateGraph, message: str
 ) -> AsyncIterator[ChatEvent]:
     inputs = {"messages": [HumanMessage(message)]}
-    # "messages" = LLM tokens as they arrive, "updates" = each node's finished output;
-    # version="v2" yields typed parts {"type": <mode>, "ns": ..., "data": ...}
+    # two views of one run: "messages" streams the LLM's output piece by piece (live text),
+    # "updates" reports each finished step (whole tool calls and results); v2 tags each part with its mode
     async for part in graph.astream(
         inputs, stream_mode=["messages", "updates"], version="v2"
     ):
@@ -30,70 +28,56 @@ async def chat_events(
             yield event
 
 
-# "messages" part data: (chunk, metadata); metadata says which node produced it (langgraph_node, langgraph_step)
-def _from_tokens(data: tuple[BaseMessage, dict[str, Any]]) -> Iterable[ChatEvent]:
+# Live LLM output: every piece becomes text or reasoning, so the user watches the answer being typed.
+def _chunk_events(data: tuple[BaseMessage, dict[str, Any]]) -> Iterator[ChatEvent]:
     msg, _metadata = data
-    # "messages" also replays finished ToolMessages; only AI chunks carry text/reasoning
+    # tool results pass through here too; they're taken from "updates" instead
     if not isinstance(msg, AIMessage):
         return
-    # content_blocks is langchain-core's provider-neutral view: reasoning_content kwargs (DeepSeek, Ollama…)
-    # and Anthropic thinking both become {"type": "reasoning"}; other blocks (tool_call_chunk…) are skipped
+    # content_blocks look the same for every provider: DeepSeek's reasoning and Anthropic's thinking are
+    # both "reasoning"; pieces of tool calls are skipped, they arrive whole in "updates"
     for block in msg.content_blocks:
-        if (to_event := _BY_BLOCK.get(block["type"])) and (
-            event := to_event(block)
-        ).text:
-            yield event
+        match block:
+            case {"type": "text", "text": str(text)} if text:
+                yield TextEvent(text=text)
+            # some providers send reasoning without text (only a signature): nothing to show
+            case {"type": "reasoning", "reasoning": str(text)} if text:
+                yield ReasoningEvent(text=text)
 
 
-# "updates" part data: {node_name: what that node returned}, e.g. {"tools": {"messages": [ToolMessage]}}
-def _from_updates(data: dict[str, Any]) -> Iterable[ChatEvent]:
-    messages = chain.from_iterable(map(_written_messages, data.values()))
-    return chain.from_iterable(map(_from_message, messages))
+# Finished steps: tool calls arrive here with complete arguments, tool results as a whole.
+def _update_events(data: dict[str, Any]) -> Iterator[ChatEvent]:
+    for output in data.values():
+        for msg in _written_messages(output):
+            yield from _message_events(msg)
 
 
-# a node's output isn't always {"messages": [...]}: None (no writes), a list (several writes),
-# a single message, or service keys like "__interrupt__" (a tuple); only message writes matter
-def _written_messages(output: Any) -> Iterable[BaseMessage]:
+def _message_events(msg: BaseMessage) -> Iterator[ChatEvent]:
+    match msg:
+        # the agent's finished reply: its text already went out live, only the tool calls are new
+        case AIMessage(tool_calls=calls):
+            for c in calls:
+                yield ToolCallEvent(id=c["id"], name=c["name"], args=c["args"])
+        case ToolMessage():
+            yield ToolResultEvent(
+                tool_call_id=msg.tool_call_id, name=msg.name, content=msg.text
+            )
+
+
+# Nodes report what they wrote in different shapes: nothing, one message, a list, or a batch of
+# several writes. Dig out the messages and ignore the rest (interrupts, cache metadata).
+def _written_messages(output: Any) -> Iterator[BaseMessage]:
     match output:
         case {"messages": BaseMessage() as msg}:
-            return (msg,)
+            yield msg
         case {"messages": list() as msgs}:
-            return msgs
+            yield from msgs
         case list() | tuple():
-            return chain.from_iterable(map(_written_messages, output))
-        case _:
-            return ()
+            for item in output:
+                yield from _written_messages(item)
 
 
-# singledispatch picks the implementation by the runtime type of `msg`; this base one covers the rest
-@singledispatch
-def _from_message(msg: BaseMessage) -> Iterable[ChatEvent]:
-    return ()
-
-
-# the finished AI message: its text/reasoning already went out as chunks, so only tool calls are new here
-@_from_message.register
-def _(msg: AIMessage) -> Iterable[ChatEvent]:
-    return (
-        ToolCallEvent(id=c["id"], name=c["name"], args=c["args"])
-        for c in msg.tool_calls
-    )
-
-
-@_from_message.register
-def _(msg: ToolMessage) -> Iterable[ChatEvent]:
-    return (
-        ToolResultEvent(tool_call_id=msg.tool_call_id, name=msg.name, content=msg.text),
-    )
-
-
-_BY_BLOCK: dict[str, Callable[[Any], TextEvent | ReasoningEvent]] = {
-    "text": lambda block: TextEvent(text=block["text"]),
-    # `reasoning` is NotRequired: a signature-only block (Bedrock, OpenAI Responses) has no text
-    "reasoning": lambda block: ReasoningEvent(text=block.get("reasoning", "")),
-}
-
-_BY_MODE: dict[str, Callable[[Any], Iterable[ChatEvent]]] = {
-    "messages": _from_tokens,
-    "updates": _from_updates,
+_BY_MODE: dict[str, Callable[[Any], Iterator[ChatEvent]]] = {
+    "messages": _chunk_events,
+    "updates": _update_events,
 }

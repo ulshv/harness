@@ -49,22 +49,22 @@ tested alone. `ChatEvent = TextEvent | ReasoningEvent | ToolCallEvent | ToolResu
 ## Translate: graph parts → events
 
 `graph.astream(inputs, stream_mode=["messages", "updates"], version="v2")` yields two kinds of parts.
-`_BY_MODE` picks a handler by stream mode; `functools.singledispatch` (`_from_message`) picks one by
+`_BY_MODE` picks a handler by stream mode; inside the handlers, `match` picks the event by block or
 message type.
 
 | What happened in the graph | Stream mode | Handler | Event |
 |---|---|---|---|
-| the LLM produced another piece of text | `messages` | `_from_tokens` → `_BY_BLOCK["text"]` | `TextEvent` |
-| the LLM produced another piece of reasoning | `messages` | `_from_tokens` → `_BY_BLOCK["reasoning"]` | `ReasoningEvent` |
-| `agent` finished, the reply has `tool_calls` | `updates` | `_from_updates` → `_from_message(AIMessage)` | `ToolCallEvent` |
-| `tools` returned a `ToolMessage` | `updates` | `_from_message(ToolMessage)` | `ToolResultEvent` |
+| the LLM produced another piece of text | `messages` | `_chunk_events`, `case {"type": "text"}` | `TextEvent` |
+| the LLM produced another piece of reasoning | `messages` | `_chunk_events`, `case {"type": "reasoning"}` | `ReasoningEvent` |
+| `agent` finished, the reply has `tool_calls` | `updates` | `_update_events` → `_message_events`, `case AIMessage()` | `ToolCallEvent` |
+| `tools` returned a `ToolMessage` | `updates` | `_message_events`, `case ToolMessage()` | `ToolResultEvent` |
 
-`_from_tokens` reads `msg.content_blocks`, langchain-core's provider-neutral view of a message: text
+`_chunk_events` reads `msg.content_blocks`, langchain-core's provider-neutral view of a message: text
 becomes `{"type": "text"}`, and `additional_kwargs["reasoning_content"]` becomes `{"type": "reasoning"}`
-(Anthropic's thinking would map to the same block). `_BY_BLOCK` maps block type to event; other blocks
-(`tool_call_chunk`, …), empty strings, and reasoning blocks without text (signature-only; `reasoning` is
-`NotRequired` in langchain-core) are skipped. Reasoning is optional: providers don't always send it, so a
-client must not wait for it.
+(Anthropic's thinking would map to the same block). A mapping pattern per block type picks the event;
+other blocks (`tool_call_chunk`, …), empty strings, and reasoning blocks without text (signature-only;
+`reasoning` is `NotRequired` in langchain-core, so a missing key simply doesn't match) are skipped.
+Reasoning is optional: providers don't always send it, so a client must not wait for it.
 
 Two more subtleties:
 

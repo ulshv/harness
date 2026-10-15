@@ -7,7 +7,7 @@ from app.api.chat.schemas import (
     ToolCallEvent,
     ToolResultEvent,
 )
-from app.api.chat.stream import _from_tokens, _from_updates
+from app.api.chat.stream import _chunk_events, _update_events
 
 CALL = AIMessage("", tool_calls=[{"name": "current_time", "args": {}, "id": "c1"}])
 RESULT = ToolMessage("12:00", tool_call_id="c1", name="current_time")
@@ -23,7 +23,7 @@ RESULT = ToolMessage("12:00", tool_call_id="c1", name="current_time")
     ],
 )
 def test_updates_without_messages_give_no_events(data):
-    assert list(_from_updates(data)) == []
+    assert list(_update_events(data)) == []
 
 
 def test_updates_with_messages_in_every_shape():
@@ -32,7 +32,7 @@ def test_updates_with_messages_in_every_shape():
         "tools": [{"messages": [RESULT]}],
     }
 
-    assert list(_from_updates(data)) == [
+    assert list(_update_events(data)) == [
         ToolCallEvent(id="c1", name="current_time", args={}),
         ToolResultEvent(tool_call_id="c1", name="current_time", content="12:00"),
     ]
@@ -69,4 +69,4 @@ def test_updates_with_messages_in_every_shape():
     ],
 )
 def test_token_chunks_become_text_or_reasoning(msg, events):
-    assert list(_from_tokens((msg, {}))) == events
+    assert list(_chunk_events((msg, {}))) == events
