@@ -8,13 +8,13 @@ from app.agent.graph import build_graph
 from app.agent.llm import make_model
 from app.api import health
 from app.api.chat import chat
-from app.settings import LLMSettings
+from app.settings import load_llm_settings
 
 type GraphFactory = Callable[[], CompiledStateGraph]
 
 
 def default_graph() -> CompiledStateGraph:
-    return build_graph(make_model(LLMSettings()))
+    return build_graph(make_model(load_llm_settings()))
 
 
 # the factory parameter is the seam for tests: they pass a graph with a fake model

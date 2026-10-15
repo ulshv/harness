@@ -10,3 +10,9 @@ class LLMSettings(BaseSettings):
     # SecretStr keeps the key out of reprs, logs and tracebacks
     api_key: SecretStr = Field(min_length=1)
     model: str = Field(min_length=1)
+
+
+def load_llm_settings() -> LLMSettings:
+    # fields come from env, which type checkers can't see: they read the signature as LLMSettings(base_url, api_key,
+    # model) and flag the empty call. One ignore here instead of one at every call site
+    return LLMSettings()  # pyright: ignore[reportCallIssue]

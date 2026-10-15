@@ -22,9 +22,9 @@ docker compose version && uv --version && go version && node --version
 
 ```bash
 cd services/harness
-uv sync                 # .venv with the dev group (pytest, ruff, httpx2)
+uv sync                 # .venv with the dev group (pytest, ruff, basedpyright, httpx2)
 uv run pytest -q
-uv run ruff check . && uv run ruff format --check .
+uv run ruff check . && uv run ruff format --check . && uv run basedpyright
 ```
 
 ### Library references

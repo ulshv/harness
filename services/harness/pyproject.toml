@@ -12,6 +12,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "basedpyright==1.40.2",
     "httpx2==2.13.1",
     "pytest==9.1.1",
     "ruff==0.17.0",
@@ -24,3 +25,7 @@ pythonpath = ["."]
 [tool.ruff.lint]
 # defaults (E, F) + import order, pyupgrade, bugbear, simplify
 extend-select = ["I", "UP", "B", "SIM"]
+
+[tool.basedpyright]
+# "standard" catches real type errors; the default "recommended" also demands annotations on every test param
+typeCheckingMode = "standard"

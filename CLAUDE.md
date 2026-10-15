@@ -80,7 +80,7 @@ moves very fast, so treat everything you remember from training as outdated unti
 | uv | 0.11.22 | Dockerfile (`ghcr.io/astral-sh/uv`) |
 | FastAPI / uvicorn | 0.143.1 / 0.54.0 | `pyproject.toml` |
 | pydantic-settings | 2.16.0 | `pyproject.toml` (history 002) |
-| pytest / ruff / httpx2 | 9.1.1 / 0.17.0 / 2.13.1 | dev group |
+| pytest / ruff / basedpyright / httpx2 | 9.1.1 / 0.17.0 / 1.40.2 / 2.13.1 | dev group (basedpyright in `standard` mode) |
 | langgraph | 1.2.15 | `pyproject.toml` (step 1) |
 | langchain-deepseek | 1.1.1 | `pyproject.toml` (history 005; replaced `ChatOpenAI` to get reasoning) |
 | langchain-openai / langchain-core | 1.7.2 / 1.6.10 (both transitive) | `uv.lock` |
@@ -170,7 +170,7 @@ You're the master-partner. You write features, I read, tweak and sometimes take 
 
 ### Verification before "done"
 
-- Before saying "it works": tests (`pytest`, `go test`), linters (`ruff`, `go vet`),
+- Before saying "it works": tests (`pytest`, `go test`), linters (`ruff`, `basedpyright`, `go vet`),
   and an **eyeball smoke test**: bring up compose, hit the endpoint, watch the stream.
   Check not "it exists" but "it's visible and does what it should".
 - In tests, expected values are literals, like a spec. Don't import constants from the code under test.

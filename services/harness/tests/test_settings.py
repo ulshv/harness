@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.settings import LLMSettings
+from app.settings import load_llm_settings
 
 VALID_ENV = {
     "LLM_BASE_URL": "https://llm.example/v1",
@@ -14,7 +14,7 @@ def test_reads_prefixed_env(monkeypatch):
     for name, value in VALID_ENV.items():
         monkeypatch.setenv(name, value)
 
-    settings = LLMSettings()
+    settings = load_llm_settings()
 
     assert str(settings.base_url) == "https://llm.example/v1"
     assert settings.api_key.get_secret_value() == "sk-test"
@@ -37,4 +37,4 @@ def test_invalid_value_fails(monkeypatch, name, value):
     monkeypatch.setenv(name, value)
 
     with pytest.raises(ValidationError):
-        LLMSettings()
+        load_llm_settings()
