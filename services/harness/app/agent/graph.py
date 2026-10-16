@@ -1,20 +1,23 @@
+from collections.abc import Sequence
+
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import SystemMessage
+from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from app.agent.tools import TOOLS
+from app.agent.errors import handle_tool_errors
 
 SYSTEM_PROMPT = "You are a concise assistant. Use tools when they help."
 # LangGraph 1.2 defaults to 10007 supersteps; a tool round is 2 (agent + tools): 25 allows 11 rounds + the answer
 RECURSION_LIMIT = 25
 
 
-def build_graph(model: BaseChatModel) -> CompiledStateGraph:
+def build_graph(model: BaseChatModel, tools: Sequence[BaseTool]) -> CompiledStateGraph:
     # bind_tools only attaches JSON schemas to each request; executing tools is the graph's job
-    llm = model.bind_tools(TOOLS)
+    llm = model.bind_tools(tools)
 
     # a node is just a function: gets the current state, returns a partial update
     async def agent(state: MessagesState):
@@ -26,8 +29,9 @@ def build_graph(model: BaseChatModel) -> CompiledStateGraph:
     # the state schema defines channels; MessagesState = one channel `messages` with the add_messages reducer
     builder = StateGraph(MessagesState)
     builder.add_node("agent", agent)
-    # ToolNode runs every tool_call of the last AI message and answers each with a ToolMessage(tool_call_id=...)
-    builder.add_node("tools", ToolNode(TOOLS))
+    # ToolNode runs every tool_call of the last AI message and answers each with a ToolMessage(tool_call_id=...);
+    # a failed call is answered too, with the handler's text and status="error"
+    builder.add_node("tools", ToolNode(tools, handle_tool_errors=handle_tool_errors))
     builder.add_edge(START, "agent")
     # tool_calls in the last AI message → "tools", otherwise → END; tools → agent closes the ReAct loop
     builder.add_conditional_edges("agent", tools_condition)

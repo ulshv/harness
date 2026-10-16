@@ -16,9 +16,9 @@ POST /chat/stream                             POST /chat/invoke
   │         └── graph.astream(...) ──┐
   │                                  ▼
   │            agent/graph.py — the agent (ReAct loop)
-  │            START → [agent] ── LLM: "I want to call current_time"
+  │            START → [agent] ── LLM: "I want to call wms_get_order"
   │                       │ tools_condition: any tool_calls?
-  │                       ├─ yes → [tools] runs the tool → back to [agent]
+  │                       ├─ yes → [tools] runs it: built-in, or wms_* → MCP server → back to [agent]
   │                       └─ no  → END
   ▼                                             ▼
   append_error_or_done ── api/chat/outcome.py: + done on success, exception → error
@@ -132,7 +132,7 @@ event: tool_call
 data: {"id":"call_1","name":"current_time","args":{}}
 
 event: tool_result
-data: {"tool_call_id":"call_1","name":"current_time","content":"2026-10-14T16:07:08+00:00"}
+data: {"tool_call_id":"call_1","name":"current_time","content":"2026-10-14T16:07:08+00:00","status":"success"}
 
 event: text
 data: {"text":"It's 16:07 UTC on Oct"}
@@ -150,7 +150,7 @@ later.
 ```json
 {"events": [
   {"type": "tool_call", "id": "call_1", "name": "current_time", "args": {}},
-  {"type": "tool_result", "tool_call_id": "call_1", "name": "current_time", "content": "2026-…"},
+  {"type": "tool_result", "tool_call_id": "call_1", "name": "current_time", "content": "2026-…", "status": "success"},
   {"type": "text", "text": "It's 16:07 UTC on October 14, 2026."},
   {"type": "done"}
 ]}
@@ -168,7 +168,10 @@ remains the exact merged form of the stream.
    only *new* messages, and the `add_messages` reducer appends them to the list.
 2. **A node is a plain function.** It takes the state and returns a partial update. `agent` calls the
    LLM (the system prompt is prepended per call, not stored in state). `ToolNode` executes every tool
-   call of the last AI message and answers each with a `ToolMessage(tool_call_id=...)`.
+   call of the last AI message and answers each with a `ToolMessage(tool_call_id=...)`. A tool that raises is
+   answered too: `handle_tool_errors` (`agent/errors.py`) keeps a bad-argument error's details for the model
+   and turns anything else into a fixed "The tool failed to run." (traceback to the log), with
+   `status="error"`, which `tool_result` carries.
 3. **Edges.** `tools → agent` is a normal edge and always fires. `tools_condition` is a conditional edge:
    tool calls → `tools`, none → `END`. Together they form the ReAct loop.
 4. **`compile()`** turns the description into a runnable (`invoke` / `astream`). One compiled graph
@@ -193,6 +196,10 @@ remains the exact merged form of the stream.
 - `main.py`: `create_app(graph_factory)` builds the graph in `lifespan`, once at startup, so a bad
   `.env` fails the boot rather than the first request. Tests pass a factory with a fake model.
 - `api/deps.py`: `Graph = Annotated[CompiledStateGraph, Depends(get_graph)]`; routes just declare `graph: Graph`.
+- `agent/mcp.py`: at startup, tools from every server in `MCP_SERVERS` (`McpSettings`, a JSON map name → URL) via
+  `langchain-mcp-adapters`, prefixed with the server name (`wms_get_order`), one server at a time: a dead server
+  is skipped with a warning. The graph factory is async because of this; the tool list is fixed until restart.
+  MCP tool errors (`is_error`) arrive as `ToolMessage(status="error")` with the server's message.
 - `settings.py`: `LLMSettings` reads `LLM_*` env. The URL is validated, the model is non-empty, and the
   key is a `SecretStr`.
 - `agent/llm.py`: `ChatDeepSeek` (langchain-deepseek) pointed at the OpenAI-compatible RouterAI `base_url`. It's a
@@ -207,7 +214,8 @@ remains the exact merged form of the stream.
 3. `api/chat/stream.py`: how the graph's progress becomes events.
 4. `api/chat/outcome.py`: the terminal events and the error table.
 5. `api/chat/batching.py`: one generator, about 20 lines.
-6. `api/chat/schemas.py`, `main.py`, `api/deps.py`: contracts and wiring.
+6. `api/chat/schemas.py`, `main.py`, `api/deps.py`: contracts and wiring; `agent/mcp.py` (tools from MCP servers)
+   and `agent/errors.py` (what a failing tool answers).
 7. Tests: `tests/api/test_chat.py` runs the same flow with a scripted fake model ("call the tool", then
    "answer") and a streaming fake that can fail mid-stream; `tests/api/chat/` covers translator, outcome
    and batching alone.

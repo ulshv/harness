@@ -34,7 +34,9 @@ def test_updates_with_messages_in_every_shape():
 
     assert list(_update_events(data)) == [
         ToolCallEvent(id="c1", name="current_time", args={}),
-        ToolResultEvent(tool_call_id="c1", name="current_time", content="12:00"),
+        ToolResultEvent(
+            tool_call_id="c1", name="current_time", content="12:00", status="success"
+        ),
     ]
 
 

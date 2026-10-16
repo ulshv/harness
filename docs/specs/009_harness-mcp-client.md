@@ -1,6 +1,6 @@
 # 009. Spec: MCP tools in harness
 
-**Status:** draft
+**Status:** implemented (2026-10-16)
 **Implements in:** `docs/history/009.md`
 
 ## Problem
@@ -69,8 +69,13 @@ run with `error: internal`. A dead MCP server mid-run would kill an answer the a
 gets a handler that:
 
 - keeps a bad-argument error's own message (the model can fix its arguments);
-- for anything else, logs the traceback and returns a fixed text: `"The tool failed to run: its service is
-  unavailable."`, so no internal URLs or exception text reach the model.
+- for anything else, logs the traceback and returns a fixed text, `"The tool failed to run."`, so no internal URLs
+  or exception text reach the model *(changed after review: not "its service is unavailable", which a local tool's
+  bug would turn into a false reason for the user)*.
+
+Every connection gets a 15 s timeout for connecting and for each response *(added after review)*: the adapters'
+defaults are 30 s and 5 minutes, so a server that accepts TCP but never answers would stall startup (one server at a
+time) and every call to it. A timeout is an ordinary exception: skipped at startup, `TOOL_FAILED` mid-run.
 
 Either way the `ToolMessage` gets `status="error"`. MCP tool errors (`is_error: true`) already arrive that way
 through the adapters, with the server's message.
@@ -82,7 +87,8 @@ through the adapters, with the server's message.
 | `pyproject.toml` / `uv.lock` | `langchain-mcp-adapters==0.3.2` (brings `mcp` 1.30.0) |
 | `app/settings.py` | `McpSettings` (`MCP_SERVERS`) and its loader |
 | `app/agent/mcp.py` | new: load tools per server, prefixed, skipping dead servers |
-| `app/agent/graph.py` | `build_graph(model, tools)`; `ToolNode(handle_tool_errors=...)` |
+| `app/agent/graph.py` | `build_graph(model, tools)`; `ToolNode(handle_tool_errors=handle_tool_errors)` |
+| `app/agent/errors.py` | `handle_tool_errors` and `TOOL_FAILED` *(during implementation: moved out of `graph.py`)* |
 | `app/main.py` | async graph factory: built-in tools + MCP tools |
 | `app/api/chat/schemas.py` / `stream.py` | `ToolResultEvent.status` |
 | `tests/conftest.py`, `tests/api/test_chat.py`, `tests/api/chat/test_stream.py` | the factory is async and `build_graph` takes tools; expected `tool_result`s gain `status` |

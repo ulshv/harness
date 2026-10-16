@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.settings import load_llm_settings
+from app.settings import McpSettings, load_llm_settings
 
 VALID_ENV = {
     "LLM_BASE_URL": "https://llm.example/v1",
@@ -38,3 +38,28 @@ def test_invalid_value_fails(monkeypatch, name, value):
 
     with pytest.raises(ValidationError):
         load_llm_settings()
+
+
+def test_mcp_servers_from_json(monkeypatch):
+    monkeypatch.setenv("MCP_SERVERS", '{"wms": "http://testing-wms-mcp:8101/mcp"}')
+
+    assert {name: str(url) for name, url in McpSettings().servers.items()} == {
+        "wms": "http://testing-wms-mcp:8101/mcp"
+    }
+
+
+def test_mcp_servers_default_to_none(monkeypatch):
+    monkeypatch.delenv("MCP_SERVERS", raising=False)
+
+    assert McpSettings().servers == {}
+
+
+@pytest.mark.parametrize(
+    "value",
+    ['{"wms": "not a url"}', '{"bad name": "http://x/mcp"}', '{"WMS": "http://x/mcp"}'],
+)
+def test_invalid_mcp_servers_fail(monkeypatch, value):
+    monkeypatch.setenv("MCP_SERVERS", value)
+
+    with pytest.raises(ValidationError):
+        McpSettings()

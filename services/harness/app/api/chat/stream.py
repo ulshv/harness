@@ -64,7 +64,10 @@ def _message_events(msg: BaseMessage) -> Iterator[ChatEvent]:
                 yield ToolCallEvent(id=c["id"], name=c["name"], args=c["args"])
         case ToolMessage():
             yield ToolResultEvent(
-                tool_call_id=msg.tool_call_id, name=msg.name, content=msg.text
+                tool_call_id=msg.tool_call_id,
+                name=msg.name,
+                content=msg.text,
+                status=msg.status,
             )
 
 

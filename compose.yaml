@@ -6,9 +6,16 @@ services:
     # graceful timeout: an open SSE stream would otherwise block the reload forever
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app --timeout-graceful-shutdown 3
     env_file: .env
+    environment:
+      # dev wiring, not a secret: the agent gets the warehouse tools as wms_*
+      MCP_SERVERS: '{"wms": "http://testing-wms-mcp:8101/mcp"}'
     ports:
       # loopback only: until auth lands, anyone on the LAN could spend the LLM key
       - "127.0.0.1:8000:8000"
+    depends_on:
+      # tools load at startup; a dead server would only be skipped, but in dev we want them there
+      testing-wms-mcp:
+        condition: service_healthy
     healthcheck:
       # the slim image has no curl, but python is always there
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

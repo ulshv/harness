@@ -43,6 +43,8 @@ class ToolResultEvent(_Event):
     tool_call_id: str
     name: str | None
     content: str
+    # "error": the tool failed or the MCP server answered is_error; the UI can show it without parsing text
+    status: Literal["success", "error"]
 
 
 # terminal events: every run ends with exactly one of these two

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import ExitStack
 
 import pytest
@@ -7,9 +7,12 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk
+from langchain_core.tools import BaseTool
+from langgraph.graph.state import CompiledStateGraph
 from pydantic import Field
 
 from app.agent.graph import build_graph
+from app.agent.tools import TOOLS
 from app.main import create_app
 
 
@@ -60,18 +63,24 @@ class StreamingFakeModel(BaseChatModel):
             raise self.error
 
 
-# a list of replies is a shortcut for the scripted, non-streaming FakeToolModel
-type ClientFactory = Callable[[BaseChatModel | list[BaseMessage]], TestClient]
+# a list of replies is a shortcut for the scripted, non-streaming FakeToolModel; tools default to the built-in ones
+type ClientFactory = Callable[..., TestClient]
 
 
 @pytest.fixture
 def make_client() -> Iterator[ClientFactory]:
     with ExitStack() as stack:
 
-        def factory(model: BaseChatModel | list[BaseMessage]) -> TestClient:
+        def factory(
+            model: BaseChatModel | list[BaseMessage], tools: Sequence[BaseTool] = TOOLS
+        ) -> TestClient:
             if isinstance(model, list):
                 model = FakeToolModel(responses=model)
-            app = create_app(lambda: build_graph(model))
+
+            async def graph() -> CompiledStateGraph:
+                return build_graph(model, tools)
+
+            app = create_app(graph)
             # entering the client runs the app's lifespan, which builds the graph
             return stack.enter_context(TestClient(app))
 

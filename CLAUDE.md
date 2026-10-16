@@ -87,7 +87,7 @@ moves very fast, so treat everything you remember from training as outdated unti
 | json5 | 0.17.3 | `services/testing-wms` (history 006; reads `seed.jsonc`) |
 | langchain | 1.4.5 | not used yet (`create_agent` hides the graph) |
 | deepagents | 0.7.25 | step 4 |
-| langchain-mcp-adapters | 0.3.2 | step 8 (requires `mcp<2`, i.e. 1.30.0 on the client side) |
+| langchain-mcp-adapters | 0.3.2 | `services/harness` (history 009; requires `mcp<2`, i.e. 1.30.0 on the client side) |
 | mcp (server SDK) | 2.3.0 | `services/testing-wms-mcp` (history 007; `MCPServer`, protocol 2026-07-28, still serves 2025-era clients) |
 | langgraph-checkpoint-postgres | 3.1.3 | step 3 |
 | Go | 1.26.2 | step 5 |
