@@ -15,8 +15,8 @@ This is step 1 of 4:
 |---|---|
 | **006** | `testing-wms`: a small warehouse REST API with seeded data and a test control panel |
 | 007 | `testing-wms-mcp`: a thin MCP server over that API, as an example of "MCP for any API" |
-| 008 | MCP client in harness: the agent sees and calls the warehouse tools |
-| 009 | Evals: cases, a runner (reset → run → read state → check), code scorers plus an LLM judge |
+| 009 | MCP client in harness: the agent sees and calls the warehouse tools |
+| 010 | Evals: cases, a runner (reset → run → read state → check), code scorers plus an LLM judge |
 
 ## Goals
 
@@ -29,7 +29,7 @@ This is step 1 of 4:
 
 ## Non-goals
 
-- MCP, harness changes, the agent prompt, eval cases (steps 007–009).
+- MCP, harness changes, the agent prompt, eval cases (steps 007–010).
 - Auth. Backlog: an API key, to test passing credentials through MCP later.
 - Persistence, receiving, picking, shipping, inventory counts. Orders are shipped only in the seeds.
 
@@ -110,7 +110,7 @@ Locations are listed explicitly in the seeds: the seven above plus two empty one
 | available ≠ on hand | `GLV-NIT-L`: 200 on hand, 90 reserved, 110 available; `A-01-02` has 120 but only 80 can move |
 | can't fully reserve | order 1003 is short 5 × `TAPE-48` |
 | order that can't change | order 999 is `shipped` |
-| failing tool | `GET /stock/SCN-01` → 503; its stock is still visible via `/locations`, a legitimate recovery path for step 009 to allow |
+| failing tool | `GET /stock/SCN-01` → 503; its stock is still visible via `/locations`, a legitimate recovery path for step 010 to allow |
 | empty vs unknown location | `D-01-01` exists and is empty; `D-09-09` doesn't exist → 404 |
 
 Reserved stock isn't stored, so it can't disagree with the orders *(changed during implementation)*. A test checks
@@ -139,7 +139,7 @@ that allocations point at existing stock rows and never exceed `on_hand`.
 | `services/testing-wms/**` | new service: app, seed, tests, `Dockerfile`, `pyproject.toml`, `uv.lock` |
 | `compose.yaml` | `testing-wms` service |
 | `Makefile` | `test` and `lint` run for both services |
-| `docs/ROADMAP.md` | "Next up": steps 006–009; backlog: API key on `testing-wms` |
+| `docs/ROADMAP.md` | "Next up": steps 006–010; backlog: API key on `testing-wms` |
 | `docs/history/006.md` | short step log |
 
 ## Tests
@@ -182,7 +182,7 @@ make test && make lint
 | Partial reserve | allowed by the API, status `partially_reserved` | "don't reserve partially without asking" is an agent policy; if the API forbade it, there'd be nothing to evaluate |
 | Failure injection | a `broken` flag on one seeded SKU → 503 | the smallest way to test tool-error handling; no fault-injection API |
 | Control endpoints | `/_reset`, `/_state` | the underscore marks them as a test panel; MCP won't expose them |
-| Auth | none | credentials belong to step 008; backlog |
+| Auth | none | credentials belong to step 009; backlog |
 | Layout | flat `app/api.py`, not `app/api/<feature>/` | a test double with one feature; CLAUDE.md's layout is for the product services |
 | Line allocations | stored per line, `reserved` is their sum *(added after review)* | cancel must know which locations to release; prose in the seeds isn't a data model |
 | Reserved stock *(changed during implementation)* | derived from allocations, not stored on stock rows | one source of truth: reserve and cancel only touch allocations, and the seed-consistency check that the first draft needed disappears. `/_state` shows the line's computed `reserved`, a `computed_field` |

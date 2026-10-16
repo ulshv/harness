@@ -9,19 +9,19 @@
 tools to any agent, and in real life an MCP server is usually a thin adapter over someone else's API. This step
 builds that adapter, as the example of "MCP for any API" that `testing-crm-mcp` and others can copy later.
 
-Step 2 of 4: 006 API → **007 MCP server** → 008 MCP client in harness → 009 evals.
+Step 2 of 4: 006 API → **007 MCP server** → 009 MCP client in harness → 010 evals.
 
 ## Goals
 
 - An MCP server with one tool per warehouse operation, described for a model: what it does, what the arguments
   mean, what can come back.
 - API errors reach the model as readable tool errors, not crashes.
-- Reachable from other compose services (harness in 008) over Streamable HTTP.
-- Proof before 008 that harness's MCP client generation can talk to it (see "Two SDK generations").
+- Reachable from other compose services (harness in 009) over Streamable HTTP.
+- Proof before 009 that harness's MCP client generation can talk to it (see "Two SDK generations").
 
 ## Non-goals
 
-- Connecting harness (008), the agent prompt and evals (009).
+- Connecting harness (009), the agent prompt and evals (010).
 - `/_reset`, `/_state`: the eval runner calls the API directly; the agent never needs them.
 - Auth, resources, prompts, elicitation.
 
@@ -33,13 +33,13 @@ self-contained. It also still serves 2025-era clients through `initialize`, from
 
 harness will use `langchain-mcp-adapters` 0.3.2 (the latest), which requires `mcp<2`. So: **the server is on
 `mcp` 2.3.0, harness stays on 1.x** until the adapters move (backlog). A smoke check in this step connects to the
-server with the adapters themselves, so 008 starts from a known-good pair.
+server with the adapters themselves, so 009 starts from a known-good pair.
 
 ## Tools
 
 The tools mirror the API one to one: it is already small and task-shaped. The curation is in names, argument
 docs and errors. Descriptions state **facts only**; policies ("don't reserve partially without asking") belong to
-the agent's prompt in 009, otherwise evals would measure the tool description instead of the agent.
+the agent's prompt in 010, otherwise evals would measure the tool description instead of the agent.
 
 | Tool | Arguments | API | Description, in short |
 |---|---|---|---|
@@ -95,7 +95,7 @@ no result at all) isn't used: every warehouse failure is something the model can
 - `app/main.py` has a `create_app()` factory: a session manager can `run()` only once, so each HTTP-level test
   builds its own app.
 - Compose: `testing-wms-mcp` on `127.0.0.1:8101`, `WMS_URL=http://testing-wms:8100`, `depends_on` testing-wms
-  healthy, its own healthcheck on `/health` (harness will depend on it in 008).
+  healthy, its own healthcheck on `/health` (harness will depend on it in 009).
 
 ## Code changes
 

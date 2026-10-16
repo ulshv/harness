@@ -41,7 +41,8 @@ ship separately.
 ## Next up (proposed, in suggested order)
 
 0. **Testing MCP and evals (branch `feat/testing-mcp`, then `feat/evals`).** 006 `testing-wms` (done), 007
-   `testing-wms-mcp` (done), 008 MCP client in harness (a first slice of step 8), 009 evals (a first slice of step 11).
+   `testing-wms-mcp` (done), 008 conversations by `thread_id` (a first slice of step 3), 009 MCP client in harness
+   (a first slice of step 8), 010 evals (a first slice of step 11).
 1. **React chat (roadmap step 2).** The event contract is ready for a frontend: a discriminated `ChatEvent`
    union in OpenAPI, `id` / `tool_call_id` pairing, batched text, `reasoning` for a spoiler, `done` / `error`.
 2. **Memory (roadmap step 3).** `thread_id` + checkpointer, so the agent remembers the conversation; start
