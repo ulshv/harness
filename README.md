@@ -228,7 +228,7 @@ Requires Docker with Compose ≥ 2.22, `make`, and [`uv`](https://docs.astral.sh
 ```bash
 git clone https://github.com/ulshv/harness.git && cd harness
 cp .env.example .env        # set LLM_API_KEY (any OpenAI-compatible endpoint; defaults: RouterAI + DeepSeek)
-make up                     # docker compose up --watch: edit code, the service reloads
+make up                     # docker compose up --watch --build: edit code, the service reloads
 curl -N localhost:8000/chat/stream -H 'content-type: application/json' -d '{"message":"hi"}'
 make test && make lint
 ```

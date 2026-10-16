@@ -60,7 +60,12 @@ def test_invoke_returns_the_whole_run(make_client):
     assert events[1].pop("content")  # the real current time, not deterministic
     assert events == [
         {"type": "tool_call", "id": "call_1", "name": "current_time", "args": {}},
-        {"type": "tool_result", "tool_call_id": "call_1", "name": "current_time"},
+        {
+            "type": "tool_result",
+            "tool_call_id": "call_1",
+            "name": "current_time",
+            "status": "success",
+        },
         {"type": "text", "text": "It is noon."},
         {"type": "done"},
     ]

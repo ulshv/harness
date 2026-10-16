@@ -227,7 +227,7 @@ data: {}
 ```bash
 git clone https://github.com/ulshv/harness.git && cd harness
 cp .env.example .env        # задайте LLM_API_KEY (любой OpenAI-совместимый эндпоинт; по умолчанию RouterAI + DeepSeek)
-make up                     # docker compose up --watch: правите код — сервис перезагружается
+make up                     # docker compose up --watch --build: правите код — сервис перезагружается
 curl -N localhost:8000/chat/stream -H 'content-type: application/json' -d '{"message":"hi"}'
 make test && make lint
 ```

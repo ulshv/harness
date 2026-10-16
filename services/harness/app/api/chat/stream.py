@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 
 from app.api.chat.schemas import (
@@ -16,13 +17,16 @@ from app.api.chat.schemas import (
 
 
 async def chat_events(
-    graph: CompiledStateGraph, message: str
+    graph: CompiledStateGraph, message: str, thread_id: str
 ) -> AsyncIterator[ChatEvent]:
+    # only the new message: the checkpointer restores the thread's history and add_messages appends to it
     inputs = {"messages": [HumanMessage(message)]}
+    # a checkpointed graph refuses to run without a thread_id
+    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
     # two views of one run: "messages" streams the LLM's output piece by piece (live text),
     # "updates" reports each finished step (whole tool calls and results); v2 tags each part with its mode
     async for part in graph.astream(
-        inputs, stream_mode=["messages", "updates"], version="v2"
+        inputs, config, stream_mode=["messages", "updates"], version="v2"
     ):
         for event in _BY_MODE[part["type"]](part["data"]):
             yield event
@@ -60,7 +64,10 @@ def _message_events(msg: BaseMessage) -> Iterator[ChatEvent]:
                 yield ToolCallEvent(id=c["id"], name=c["name"], args=c["args"])
         case ToolMessage():
             yield ToolResultEvent(
-                tool_call_id=msg.tool_call_id, name=msg.name, content=msg.text
+                tool_call_id=msg.tool_call_id,
+                name=msg.name,
+                content=msg.text,
+                status=msg.status,
             )
 
 

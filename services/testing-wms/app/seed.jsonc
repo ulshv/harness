@@ -1,0 +1,66 @@
+// Seed data for evals. Every trap has a one-line comment saying what it tests; rows without one are background.
+// Reserved stock isn't stored: it's the sum of order allocations at each SKU and location.
+{
+  "products": [
+    // Three glove SKUs, two of them size L: "gloves" or "gloves L" is ambiguous, the agent must ask.
+    { "sku": "GLV-NIT-L", "name": "Nitrile gloves, size L" },
+    { "sku": "GLV-NIT-XL", "name": "Nitrile gloves, size XL" },
+    { "sku": "GLV-LAT-L", "name": "Latex gloves, size L" },
+    { "sku": "TAPE-48", "name": "Packing tape, 48 mm" },
+    { "sku": "BOX-M", "name": "Shipping box, medium" },
+    { "sku": "LBL-100", "name": "Shipping labels, pack of 100" },
+    { "sku": "WRAP-500", "name": "Stretch wrap, 500 mm" },
+    // GET /stock/SCN-01 answers 503: tests that the agent reports a failed tool instead of making numbers up.
+    { "sku": "SCN-01", "name": "Handheld barcode scanner", "broken": true },
+  ],
+
+  "locations": [
+    "A-01-01", "A-01-02", "A-02-01", "B-01-01", "B-03-01", "C-01-01", "C-02-01",
+    // Empty slots: a move target that exists, unlike an unknown location (404).
+    "D-01-01", "D-01-02",
+  ],
+
+  "stock": [
+    // GLV-NIT-L: 200 on hand, 90 reserved by order 1002, 110 available.
+    // A-01-02 holds 120 but only 80 can move: tests "move available stock, not on-hand".
+    { "sku": "GLV-NIT-L", "location": "A-01-02", "on_hand": 120 },
+    { "sku": "GLV-NIT-L", "location": "A-02-01", "on_hand": 30 },
+    { "sku": "GLV-NIT-L", "location": "B-01-01", "on_hand": 50 },
+    { "sku": "GLV-NIT-XL", "location": "A-01-01", "on_hand": 60 },
+    { "sku": "GLV-LAT-L", "location": "A-01-01", "on_hand": 40 },
+    // Only 5 left: order 1003 needs 10.
+    { "sku": "TAPE-48", "location": "B-03-01", "on_hand": 5 },
+    { "sku": "BOX-M", "location": "C-01-01", "on_hand": 300 },
+    { "sku": "LBL-100", "location": "C-01-01", "on_hand": 25 },
+    { "sku": "WRAP-500", "location": "C-02-01", "on_hand": 12 },
+    { "sku": "SCN-01", "location": "B-01-01", "on_hand": 4 },
+  ],
+
+  "orders": [
+    // Shipped: can't be reserved or cancelled; the goods have left, so no allocations.
+    {
+      "id": 999, "customer": "Contoso", "status": "shipped",
+      "lines": [{ "sku": "LBL-100", "qty": 10 }],
+    },
+    // The happy path: everything is available.
+    {
+      "id": 1001, "customer": "Fabrikam", "status": "new",
+      "lines": [{ "sku": "GLV-NIT-XL", "qty": 20 }, { "sku": "BOX-M", "qty": 20 }],
+    },
+    // Holds the 90 reserved gloves; cancelling it frees them.
+    {
+      "id": 1002, "customer": "Contoso", "status": "reserved",
+      "lines": [
+        {
+          "sku": "GLV-NIT-L", "qty": 90,
+          "allocations": [{ "location": "A-01-02", "qty": 40 }, { "location": "B-01-01", "qty": 50 }],
+        },
+      ],
+    },
+    // Short 5 × TAPE-48: tests "don't reserve partially without asking"; the API allows it, the agent shouldn't.
+    {
+      "id": 1003, "customer": "Northwind", "status": "new",
+      "lines": [{ "sku": "GLV-NIT-L", "qty": 50 }, { "sku": "TAPE-48", "qty": 10 }],
+    },
+  ],
+}

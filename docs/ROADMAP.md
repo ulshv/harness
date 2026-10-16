@@ -40,6 +40,9 @@ ship separately.
 
 ## Next up (proposed, in suggested order)
 
+0. **Testing MCP and evals (branch `feat/testing-mcp`, then `feat/evals`).** 006 `testing-wms` (done), 007
+   `testing-wms-mcp` (done), 008 conversations by `thread_id` (done; a first slice of step 3), 009 MCP client in harness
+   (done; a first slice of step 8), 010 evals (a first slice of step 11).
 1. **React chat (roadmap step 2).** The event contract is ready for a frontend: a discriminated `ChatEvent`
    union in OpenAPI, `id` / `tool_call_id` pairing, batched text, `reasoning` for a spoiler, `done` / `error`.
 2. **Memory (roadmap step 3).** `thread_id` + checkpointer, so the agent remembers the conversation; start
@@ -62,3 +65,8 @@ ship separately.
 | `interrupt` terminal event | the root graph swallows `GraphInterrupt` and emits `__interrupt__` in `updates`, so a paused run ends with `done` | human-in-the-loop (with deepagents, step 4) | history 004 |
 | Error code for context overflow | `ContextOverflowError` is `internal` now; the user can't act on that | memory (step 3) makes long histories common | history 004 |
 | Streaming fake with tool calls | `StreamingFakeModel` streams text only, so tool-call chunk streaming (`tool_call_chunks`) is untested | big-argument tools (step 4) | history 004 |
+| API key on `testing-wms` | the test API is open; real MCP integrations carry credentials | MCP credentials in harness (step 8) | spec 006 |
+| harness on `mcp` 2 | harness's MCP client is `mcp` 1.x because `langchain-mcp-adapters` 0.3.2 requires `mcp<2`; the server side is already 2.3.0 | when the adapters support `mcp` 2 | spec 007 |
+| Threads: owner, storage, TTL | any client that knows a `thread_id` can read and continue it; threads live in process memory, every request without one leaves a thread behind, and `InMemorySaver` keeps a full history copy per step, until a restart | auth (step 5) for owners; Postgres with a TTL (step 3); deleting anonymous threads after their run (`adelete_thread`) if evals (010) make memory matter | spec 008 |
+| Interrupted runs break their thread | a run stopped between a tool call and its answer (`recursion_limit`, a disconnect, two requests on one thread) leaves an unanswered call; providers reject the history, so the thread fails from then on. No library repairs it except deepagents' `PatchToolCallsMiddleware` | moving to deepagents (step 4), or earlier if it bites in the React chat | spec 008 |
+| A dead tool gets retried | with the MCP server down, the agent called failing tools 7 times before giving up (smoke run, history 009) | a policy in the system prompt, measured by evals | history 009 |
