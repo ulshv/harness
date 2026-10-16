@@ -19,15 +19,15 @@ suggested order.
 | 0 | Skeleton: monorepo, `compose.yaml` with `develop.watch`, healthchecks, harness serves `/health` and reloads on file save | done: history 000 |
 | 1 | First agent: LangGraph agent with one tool, token streaming over SSE, verify with `curl -N` | done: history 001; extended in 002 (production layout), 003 (`/chat/stream` + `/chat/invoke`, batching) 004 (`error` / `done` events) and 005 (`reasoning` event) |
 | 2 | React chat with streaming | — |
-| 3 | Memory: threads and Postgres checkpointer, conversation continues after a restart | — |
+| 3 | Memory: threads and Postgres checkpointer, conversation continues after a restart | started: history 008 (`thread_id`, in-memory checkpointer) |
 | 4 | deepagents: planning, virtual FS, subagents; the agent's todo list visible in the UI | — |
 | 5 | auth (Go): signup/login, passwords (argon2id), access JWT (EdDSA/RS256) + JWKS, refresh rotation, httpOnly cookie; harness validates tokens, anonymous gets 401 | — |
 | 6 | RBAC: roles, protected `/admin`, 403 for `user` | — |
 | 7 | Skills from the admin panel: CRUD in the DB, harness picks them up without a restart | — |
-| 8 | External MCP from the admin panel: server registry, credentials, the agent sees and calls their tools | — |
+| 8 | External MCP from the admin panel: server registry, credentials, the agent sees and calls their tools | started: history 009 (servers from `MCP_SERVERS` env, tools at startup) |
 | 9 | Observability: agent traces (Langfuse / OpenTelemetry), logs with trace-id across all services | — |
 | 10 | Kubernetes: minikube/kind + Tilt, same services, same hot-reload | — |
-| 11 | Evals in Langfuse: datasets of cases (curated, plus harvested from production traces), experiment runs against the agent, LLM-as-judge and code scorers, a regression gate in CI | — |
+| 11 | Evals in Langfuse: datasets of cases (curated, plus harvested from production traces), experiment runs against the agent, LLM-as-judge and code scorers, a regression gate in CI | started: history 006–007 (a testing warehouse and its MCP server) |
 | 12 | Custom tools as plugins: tools packaged and registered without touching the agent core | — |
 | 13 | Dictionaries: per-environment values that skills reference by name. One skill (say "update the deal amount") works across environments where the same MCP server exposes different internals (`cf_12345` in one CRM, `UF_CRM_AMOUNT` in another) | — |
 | 14 | Multi-tenancy: tenant isolation for threads, skills, dictionaries, MCP credentials | — |
@@ -40,13 +40,13 @@ ship separately.
 
 ## Next up (proposed, in suggested order)
 
-0. **Testing MCP and evals (branch `feat/testing-mcp`, then `feat/evals`).** 006 `testing-wms` (done), 007
-   `testing-wms-mcp` (done), 008 conversations by `thread_id` (done; a first slice of step 3), 009 MCP client in harness
-   (done; a first slice of step 8), 010 evals (a first slice of step 11).
-1. **React chat (roadmap step 2).** The event contract is ready for a frontend: a discriminated `ChatEvent`
-   union in OpenAPI, `id` / `tool_call_id` pairing, batched text, `reasoning` for a spoiler, `done` / `error`.
-2. **Memory (roadmap step 3).** `thread_id` + checkpointer, so the agent remembers the conversation; start
-   in memory, then Postgres.
+0. **React chat (roadmap step 2), 010.** [specs/010](specs/010_react-chat.md). The event contract is ready for a
+   frontend: a discriminated `ChatEvent` union in OpenAPI, `id` / `tool_call_id` pairing, batched text,
+   `reasoning`, `done` / `error`, `tool_result.status`. Substeps 010.1–010.3.
+1. **Evals (a first slice of step 11), branch `feat/evals`.** The warehouse is ready: `testing-wms` (006),
+   `testing-wms-mcp` (007), threads (008), MCP tools in harness (009).
+2. **Memory (roadmap step 3).** Threads already work in memory (008); next is the Postgres checkpointer, so a
+   conversation survives a restart.
 
 ## Backlog
 
