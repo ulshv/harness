@@ -1,8 +1,9 @@
 .PHONY: up test lint
 
-# dev loop: build, start and sync code changes into containers (see develop.watch in compose.yaml)
+# dev loop: build, start and sync code changes into containers (see develop.watch in compose.yaml).
+# --build: watch syncs only files changed after start, so a stale image would run old code; cached layers keep it fast
 up:
-	docker compose up --watch
+	docker compose up --watch --build
 
 SERVICES := harness testing-wms testing-wms-mcp
 
