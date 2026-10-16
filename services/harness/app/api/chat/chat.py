@@ -18,7 +18,9 @@ router = APIRouter(prefix="/chat")
 @router.post("/stream", response_class=EventSourceResponse)
 async def stream(req: ChatRequest, graph: Graph) -> AsyncIterable[ServerSentEvent]:
     # append_error_or_done sits before batching: done/error are non-text events, so buffered text flushes first
-    events = batch_events(append_error_or_done(chat_events(graph, req.message)))
+    events = batch_events(
+        append_error_or_done(chat_events(graph, req.message, req.thread_id))
+    )
     async for event in events:
         # the SSE event name already says what it is, so `type` stays out of the payload;
         # raw_data + model_dump_json keeps pydantic's compact JSON (a dict would go through json.dumps, with spaces)
@@ -34,7 +36,8 @@ async def stream(req: ChatRequest, graph: Graph) -> AsyncIterable[ServerSentEven
 async def invoke(req: ChatRequest, graph: Graph) -> ChatResponse | JSONResponse:
     # infinite window: time never flushes, so each contiguous text/reasoning run merges into one event
     stream = batch_events(
-        append_error_or_done(chat_events(graph, req.message)), window=math.inf
+        append_error_or_done(chat_events(graph, req.message, req.thread_id)),
+        window=math.inf,
     )
     events = [event async for event in stream]
     if isinstance(events[-1], ErrorEvent):

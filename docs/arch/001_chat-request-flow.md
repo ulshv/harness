@@ -11,7 +11,7 @@ POST /chat/stream                             POST /chat/invoke
   ▼  api/chat/chat.py — HTTP (router prefix /chat)
   │  FastAPI takes the compiled graph from app.state (api/deps.py; built at startup in main.py)
   ▼                                             ▼
-  chat_events(graph, message)  ── api/chat/stream.py: graph parts → ChatEvent
+  chat_events(graph, message, thread_id)  ── api/chat/stream.py: graph parts → ChatEvent
   │         │
   │         └── graph.astream(...) ──┐
   │                                  ▼
@@ -173,11 +173,20 @@ remains the exact merged form of the stream.
    tool calls → `tools`, none → `END`. Together they form the ReAct loop.
 4. **`compile()`** turns the description into a runnable (`invoke` / `astream`). One compiled graph
    serves all requests concurrently, because each `astream()` call carries its own run state. That's why
-   it lives once in `app.state`. There is no checkpointer yet, so no memory between requests.
+   it lives once in `app.state`.
    `with_config(recursion_limit=RECURSION_LIMIT)` (25 supersteps: 11 tool rounds plus the answer) caps a looping agent.
    LangGraph 1.2's default is 10007.
 5. **`bind_tools`** only attaches the tools' JSON schemas to the request. The model *asks* for a call;
    the graph executes it.
+6. **Checkpointer and threads.** `compile(checkpointer=InMemorySaver())` saves the state after every step under
+   the run's `thread_id` (`config={"configurable": {"thread_id": ...}}`), and the next run on that thread starts
+   from it: the input carries only the new `HumanMessage`, and `add_messages` appends it to the restored history.
+   What's saved is what nodes return, so the system prompt never is. The client picks `thread_id` in
+   `ChatRequest`; without one the schema's `default_factory` makes a fresh UUID, a single turn. Threads live in
+   process memory: a restart or a hot reload forgets them, and every checkpoint (a full history copy per step) is
+   kept until then, anonymous threads included. A run interrupted between a tool call and its answer
+   (`recursion_limit`, a disconnect, two requests on one thread) leaves the thread with an unanswered call, which
+   providers reject, so that thread fails from then on; the client starts a new one (spec 008).
 
 ## Wiring around the agent
 

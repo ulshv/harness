@@ -1,10 +1,17 @@
 from typing import Annotated, Any, Literal
+from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+# a client-chosen conversation id: safe to log and to use as a storage key later
+ThreadId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
+    # omitted → a fresh thread per request, a single turn as before; default_factory instead of `| None` keeps
+    # OpenAPI a plain optional string and rejects an explicit null
+    thread_id: ThreadId = Field(default_factory=lambda: str(uuid4()))
 
 
 class _Event(BaseModel):

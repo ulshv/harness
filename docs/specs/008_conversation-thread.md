@@ -1,6 +1,6 @@
 # 008. Spec: conversations by `thread_id`
 
-**Status:** draft
+**Status:** implemented (2026-10-16)
 **Implements in:** `docs/history/008.md`
 
 ## Problem
@@ -64,8 +64,10 @@ By design for now:
 - Anyone who knows a `thread_id` can read and continue that conversation. Fine while there is no auth; threads get
   an owner with auth (roadmap step 5).
 - Threads live in process memory: a restart or any hot reload of `app/` forgets them, and every request without a
-  `thread_id` leaves a thread nobody reads again, so memory grows until a restart. Postgres with a TTL is roadmap
-  step 3.
+  `thread_id` leaves a thread nobody reads again, so memory grows until a restart. `InMemorySaver` keeps every
+  checkpoint, a full copy of the history per step, so a thread's footprint grows roughly with the square of its
+  turns *(noted after review)*. Postgres with a TTL is roadmap step 3; deleting anonymous threads after their run
+  is a small fix if it starts to matter (evals in 010 send many requests).
 - Two requests on one thread at the same time: the later run starts from the other's unfinished state, and the
   thread keeps only one run's answer (last writer wins).
 - A thread's history grows without bound.

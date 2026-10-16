@@ -1,5 +1,6 @@
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import SystemMessage
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -31,6 +32,7 @@ def build_graph(model: BaseChatModel) -> CompiledStateGraph:
     # tool_calls in the last AI message → "tools", otherwise → END; tools → agent closes the ReAct loop
     builder.add_conditional_edges("agent", tools_condition)
     builder.add_edge("tools", "agent")
-    # compile() validates the wiring and returns a runnable (invoke/astream); no checkpointer yet → no memory.
-    # with_config bakes the limit into every run; hitting it raises GraphRecursionError
-    return builder.compile().with_config(recursion_limit=RECURSION_LIMIT)
+    # compile() validates the wiring and returns a runnable (invoke/astream). The checkpointer saves the state after
+    # every step under the run's thread_id, and the next run on that thread starts from it
+    graph = builder.compile(checkpointer=InMemorySaver())
+    return graph.with_config(recursion_limit=RECURSION_LIMIT)
