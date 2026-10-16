@@ -43,8 +43,8 @@ services/webapp/src/
   api/          transport: streamChat(), generated OpenAPI types. No React.
   chat/         domain: the turn model, a pure reducer over ChatEvents, the useChat() hook. No JSX.
   components/   UI kit: props in, JSX out. Imports nothing from api/ or chat/.
-  containers/   glue: read useChat(), map the turn model to components (MessageList, Activity, Composer).
-  pages/        ChatPage: lays out containers.
+  containers/   glue: map the turn model to components (MessageList, Reply, Activity, Composer).
+  pages/        ChatPage: owns useChat() and hands each container its slice.
   index.css     Tailwind + design tokens: the only place with colors.
 ```
 
@@ -59,7 +59,7 @@ The parser handles chunk splits and the keepalive comments (`: ping`). harness s
 name and keeps it out of `data`, so the client puts it back: `{type: msg.event, ...JSON.parse(msg.data)}`.
 
 ```ts
-streamChat(req: ChatRequest, signal: AbortSignal): AsyncGenerator<ChatEvent>
+streamChat(req: ChatRequest, signal?: AbortSignal): AsyncGenerator<ChatEvent>
 ```
 
 A non-2xx response throws `HttpError(status)`. A stream that ends without `done`/`error` is reported by the
@@ -130,15 +130,15 @@ In every case the turn ends and the composer is enabled again.
 ### Theming
 
 Tailwind 4 is configured in CSS. `index.css` resets the default palette (`--color-*: initial`) and defines
-semantic tokens in `@theme`: `bg`, `surface`, `border`, `text`, `muted`, `accent`, `danger`, `success`, plus
-radius and font. Components can only use `bg-surface`, `text-muted`, …: a raw `bg-gray-100` doesn't exist, so a
+semantic color tokens in `@theme`: `bg`, `surface`, `border`, `fg`, `muted`, `accent`, `on-accent`, `danger`,
+`success`. Radius and font stay Tailwind's defaults until a design needs its own. Components can only use `bg-surface`, `text-muted`, …: a raw `bg-gray-100` doesn't exist, so a
 reskin is editing one file. Dark mode overrides the same variables under `prefers-color-scheme: dark`.
 
 ### Dev loop
 
 A `webapp` service in `compose.yaml` on `node:22.22.3-alpine`: `npm ci` in the image, `vite --host` as the
 command, `127.0.0.1:8080`, `develop.watch` syncing `src/` (Vite's HMR picks it up) and rebuilding on
-`package.json` / `package-lock.json`. The port is Vite's `server.port: 8080` with `strictPort`: a busy port fails
+`package.json` / `package-lock.json` / `vite.config.ts` / `index.html`. The port is Vite's `server.port: 8080` with `strictPort`: a busy port fails
 the start instead of silently moving to 8081. The proxy target is `HARNESS_URL` (compose: `http://harness:8000`;
 default `http://localhost:8000`, so `npm run dev` on the host works against `make up` too).
 
@@ -146,14 +146,14 @@ default `http://localhost:8000`, so `npm run dev` on the host works against `mak
 
 | # | Result you can poke | Contents |
 |---|---|---|
-| 010.1 | type a message at `:8080`, the answer streams in as plain text | scaffold, compose service, proxy, tokens, `streamChat`, generated types, a text-only turn, `make lint`/`make test` |
+| 010.1 | type a message at `:8080`, the answer streams in as plain text; a failed request shows its error | scaffold, compose service, proxy, tokens, `streamChat`, generated types, a text-only turn that always ends (`closeTurn`), `make lint`/`make test` |
 | 010.2 | the activity block fills, scrolls and folds; the answer is Markdown | turn model with parts, `splitTurn`, Activity container, Markdown |
-| 010.3 | errors show in the turn; "New chat"; follow-ups on one thread | error handling, thread id, stick-to-bottom |
+| 010.3 | "New chat"; follow-ups on one thread; the list follows the stream | thread id, stick-to-bottom |
 
 ## Code changes
 
 - New `services/webapp/`: `package.json` (+ lock), `vite.config.ts`, `tsconfig*.json`, `.oxlintrc.json`,
-  `.prettierrc`, `Dockerfile`, `index.html`, `src/` as in Layers.
+  `.prettierrc.json`, `Dockerfile`, `index.html`, `src/` as in Layers.
 - `compose.yaml`: the `webapp` service.
 - `Makefile`: webapp in `test` and `lint`; `api-types`.
 - `CLAUDE.md`: layout (`services/webapp` instead of `web/`), pinned versions.
@@ -200,3 +200,22 @@ open http://localhost:8080
 | 8 | Markdown | react-markdown 10 + remark-gfm 4, typography plugin | plain text: the agent answers in tables |
 | 9 | Lint / format / test | oxlint (template default) + Prettier with the Tailwind plugin; `tsc -b`; Vitest 5 | ESLint: slower, more config; Biome: formatter is fine, but we'd drop the template's linter |
 | 10 | Dev loop | compose service with watch | host-only `npm run dev`: one more terminal, breaks "`make up` brings it all" |
+
+## Deviations
+
+Recorded during 010.1:
+
+- **`fg`, not `text`**: a `text` color token makes `text-text`. `on-accent` was added for text on accent buttons
+  (the reset removes `white`). Radius and font tokens were dropped: Tailwind's defaults until a design asks.
+- **The page owns `useChat()`.** Two containers calling the hook would get two separate chats; the page calls it
+  once and passes `exchanges`, `busy` and `send` down.
+- **Turn endings moved to 010.1.** Without them a failed request leaves the composer disabled forever, so
+  `closeTurn` (a turn with no `done`/`error` becomes "Connection lost") and the `HttpError` message ship with the
+  first stream. 010.3 keeps the thread and the scrolling.
+- **A text-only turn is `{text, status, error}`**, not parts: with one kind of part the array is premature. 010.2
+  turns it into parts.
+- **Prettier `printWidth: 100`**: at 80, Tailwind class lists and typed props wrap on almost every line.
+- **The dev proxy cuts a broken stream.** Found in review: when harness dies mid-stream, Vite's proxy (http-proxy-3)
+  never ends the browser's response, so the turn would stay "streaming" forever. `configure` destroys the
+  response when the upstream one closes incomplete. A client-side idle watchdog would also cover half-open TCP
+  and a prod reverse proxy; it's in the backlog.

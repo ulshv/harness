@@ -27,6 +27,18 @@ uv run pytest -q
 uv run ruff check . && uv run ruff format --check . && uv run basedpyright
 ```
 
+### Local dev for webapp (history 010)
+
+`make up` runs the Vite dev server in a container; `make test` and `make lint` run on the host and need the
+packages there too:
+
+```bash
+npm ci --prefix services/webapp   # node_modules from the lock file, exact versions
+npm --prefix services/webapp test
+npm --prefix services/webapp run lint   # oxlint, prettier --check, tsc -b
+npm --prefix services/webapp run dev    # optional: Vite on the host, proxying /api to localhost:8000
+```
+
 ### MCP Inspector
 
 The official UI for poking an MCP server: lists its tools with descriptions and calls them by hand. Needs Node.

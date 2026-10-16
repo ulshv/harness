@@ -52,13 +52,13 @@ vibe-codes everything in a couple of sessions.
 - **auth** (Go): login, sessions, short-lived access tokens (asymmetric signing,
   JWKS endpoint), refresh token rotation, RBAC (at least `user` / `admin`),
   service tokens later. harness verifies tokens itself via JWKS and doesn't call auth on every request.
-- **web** (React): streaming chat, thread list. `/admin`: CRUD for custom
+- **webapp** (React, `services/webapp`): streaming chat, thread list. `/admin`: CRUD for custom
   skills, registry of external MCP integrations (URL, transport, credentials), users and roles.
 - **Infra**: start with `docker compose up --watch` (`develop.watch`: `sync` +
   hot-reload for Python and Vite, `rebuild` for Go). Later minikube or kind plus Tilt/Skaffold,
   so the same dev loop works in k8s.
 
-Repo layout (monorepo): `services/harness`, `services/auth`, `web/`, `deploy/`
+Repo layout (monorepo): `services/harness`, `services/auth`, `services/webapp` (the React frontend), `deploy/`
 (k8s manifests/Helm later), `docs/`. `compose.yaml` lives in the root so `docker compose up --watch`
 works without `-f`.
 
@@ -91,7 +91,12 @@ moves very fast, so treat everything you remember from training as outdated unti
 | mcp (server SDK) | 2.3.0 | `services/testing-wms-mcp` (history 007; `MCPServer`, protocol 2026-07-28, still serves 2025-era clients) |
 | langgraph-checkpoint-postgres | 3.1.3 | step 3 |
 | Go | 1.26.2 | step 5 |
-| Node | 22.22 | step 2 |
+| Node | 22.22.3 (`node:22.22.3-alpine`) | `services/webapp/Dockerfile` (history 010) |
+| Vite / React / TypeScript | 8.3.4 / 19.3.1 / 6.0.3 | `services/webapp` (history 010; TS 6 is strict by default; TS 7 is the Go port, not yet supported by tools that use the compiler API) |
+| Tailwind CSS | 4.3.3 (`@tailwindcss/vite`) | `services/webapp` (history 010; configured in CSS, `@theme` tokens) |
+| eventsource-parser | 4.1.2 | `services/webapp` (history 010; SSE over `fetch` POST) |
+| Vitest / oxlint / Prettier | 5.0.5 / 1.88.0 / 3.9.10 (+ `prettier-plugin-tailwindcss` 0.8.1) | webapp dev deps |
+| openapi-typescript | 7.13.0 | `make api-types` via `npx` (peer `typescript@^5`, so not a dependency) |
 | Docker / Compose | 29.5.3 / v5.1.4 | host |
 
 ## Docs and references
