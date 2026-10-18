@@ -2,11 +2,12 @@
 
 **English** · [Русский](README-ru.md)
 
-**An open-source foundation for building AI agents for enterprises and startups.** It includes SSE streaming,
+**An open-source, production-ready foundation for building AI agents for enterprises and startups.** It includes SSE streaming,
 tools, skills, MCP integration, a web app, an admin panel, a dedicated auth service and more to come! (see [Roadmap](#roadmap))
 
 I've spent the last two years building AI agent harnesses that run in enterprise production. This project is
-how I think the foundation of such a harness should be built.
+how I think the foundation of such a harness should be built. It's meant to be the base an enterprise or a startup
+builds its own AI agents on.
 
 ![status](https://img.shields.io/badge/status-draft%20%2F%20WIP-orange)
 ![python](https://img.shields.io/badge/python-3.14-3776AB)

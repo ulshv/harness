@@ -2,11 +2,12 @@
 
 [English](README.md) · **Русский**
 
-**Open-source основа для построения ИИ-агентов для предприятий и стартапов.** Включает в себя SSE-streaming,
-tools, skills, MCP integration, webapp, admin panel, выделенный Auth-сервис — и это ещё не всё! (см. [Roadmap](#roadmap))
+**Open-source и production-ready основа для построения ИИ-агентов для предприятий и стартапов.** Включает в себя SSE-streaming,
+tools, skills, MCP integration, webapp, admin panel, выделенный Auth-сервис — и больше! (см. [Roadmap](#roadmap))
 
 Последние два года я строю харнессы для AI-агентов, которые работают в enterprise production. Этот проект —
-то, как по моему мнению должна быть устроена основа такого харнесса.
+то, как по моему мнению должна быть устроена основа такого харнесса. Это база, на которой энтерпрайз или
+стартап строит собственных ИИ-агентов.
 
 ![status](https://img.shields.io/badge/status-draft%20%2F%20WIP-orange)
 ![python](https://img.shields.io/badge/python-3.14-3776AB)
