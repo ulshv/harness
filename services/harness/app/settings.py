@@ -1,7 +1,9 @@
 from typing import Annotated
 
-from pydantic import Field, HttpUrl, SecretStr, StringConstraints
+from pydantic import Field, FilePath, HttpUrl, SecretStr, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.agent.graph import DEFAULT_RECURSION_LIMIT, DEFAULT_SYSTEM_PROMPT
 
 
 class LLMSettings(BaseSettings):
@@ -30,3 +32,17 @@ class McpSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="MCP_")
 
     servers: dict[ServerName, HttpUrl] = Field(default_factory=dict)
+
+
+class AgentSettings(BaseSettings):
+    # reads AGENT_SYSTEM_PROMPT_FILE / AGENT_RECURSION_LIMIT; a prompt path that isn't an existing file fails startup
+    model_config = SettingsConfigDict(env_prefix="AGENT_")
+
+    # a file, not the text in env: a deployment swaps the agent's role without touching the core
+    system_prompt_file: FilePath | None = None
+    recursion_limit: int = Field(default=DEFAULT_RECURSION_LIMIT, ge=1)
+
+    def system_prompt(self) -> str:
+        if self.system_prompt_file is None:
+            return DEFAULT_SYSTEM_PROMPT
+        return self.system_prompt_file.read_text(encoding="utf-8")

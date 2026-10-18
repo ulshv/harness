@@ -58,9 +58,10 @@ vibe-codes everything in a couple of sessions.
   hot-reload for Python and Vite, `rebuild` for Go). Later minikube or kind plus Tilt/Skaffold,
   so the same dev loop works in k8s.
 
-Repo layout (monorepo): `services/harness`, `services/auth`, `services/webapp` (the React frontend), `deploy/`
+Repo layout (monorepo): `services/harness`, `services/auth`, `services/webapp` (the React frontend),
+`services/testing/` (the demo systems the agent works across: WMS, ERP, marketplace, chat), `deploy/`
 (k8s manifests/Helm later), `docs/`. `compose.yaml` lives in the root so `docker compose up --watch`
-works without `-f`.
+works without `-f`; `compose.testing.yaml` adds the demo systems (`make up:demo`).
 
 ## Tech Stack
 
@@ -84,11 +85,11 @@ moves very fast, so treat everything you remember from training as outdated unti
 | langgraph | 1.2.15 | `pyproject.toml` (step 1) |
 | langchain-deepseek | 1.1.1 | `pyproject.toml` (history 005; replaced `ChatOpenAI` to get reasoning) |
 | langchain-openai / langchain-core | 1.7.2 / 1.6.10 (both transitive) | `uv.lock` |
-| json5 | 0.17.3 | `services/testing-wms` (history 006; reads `seed.jsonc`) |
+| json5 | 0.17.3 | `services/testing/*-api` (history 006; reads `seed.jsonc`) |
 | langchain | 1.4.5 | not used yet (`create_agent` hides the graph) |
 | deepagents | 0.7.25 | step 4 |
 | langchain-mcp-adapters | 0.3.2 | `services/harness` (history 009; requires `mcp<2`, i.e. 1.30.0 on the client side) |
-| mcp (server SDK) | 2.3.0 | `services/testing-wms-mcp` (history 007; `MCPServer`, protocol 2026-07-28, still serves 2025-era clients) |
+| mcp (server SDK) | 2.3.0 | `services/testing/*-mcp` (history 007; `MCPServer`, protocol 2026-07-28, still serves 2025-era clients) |
 | langgraph-checkpoint-postgres | 3.1.3 | step 3 |
 | Go | 1.26.2 | step 5 |
 | Node | 22.22.3 (`node:22.22.3-alpine`) | `services/webapp/Dockerfile` (history 010) |

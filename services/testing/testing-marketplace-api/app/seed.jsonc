@@ -1,0 +1,35 @@
+// The CoffeeSupplies LLC seller account on an Amazon-like marketplace (spec 011): its orders and listings.
+// Rows of a demo scenario carry a comment naming it (S1–S3); the rest is background.
+// Times are offsets from startup: "+6h" is six hours after the service started.
+{
+  "orders": [
+    { "id": "114-1022854", "buyer": "James Carter", "status": "shipped", "ship_by": "-7d", "lines": [{ "sku": "GRN-HOME", "qty": 1 }] },
+    { "id": "114-2290475", "buyer": "Priya Nair", "status": "unshipped", "ship_by": "+1d", "lines": [{ "sku": "TEA-GRN-100", "qty": 2 }] },
+    { "id": "114-4418306", "buyer": "Tomás Rivera", "status": "unshipped", "ship_by": "+1d", "lines": [{ "sku": "FLT-V60-100", "qty": 3 }] },
+    { "id": "114-6093711", "buyer": "Hannah Becker", "status": "unshipped", "ship_by": "+1d", "lines": [{ "sku": "COF-ESP-1KG", "qty": 2 }] },
+    // S2: the order that took the last two kettles, while the listing still offers 25.
+    { "id": "114-5520917", "buyer": "Chloe Martin", "status": "unshipped", "ship_by": "+1d", "lines": [{ "sku": "KET-GOOSE", "qty": 2 }] },
+    // S1: must ship within 6 hours; the grinders are held by an unpaid B2B order.
+    { "id": "114-3349201", "buyer": "Daniel Novak", "status": "unshipped", "ship_by": "+6h", "lines": [{ "sku": "GRN-HOME", "qty": 6 }] },
+    // S3: the order the sync lost: it never reached the ERP or the warehouse.
+    { "id": "114-7781302", "buyer": "Sofia Rossi", "status": "unshipped", "ship_by": "+1d", "lines": [{ "sku": "COF-ESP-1KG", "qty": 3 }] },
+  ],
+
+  // prices are the ones the ERP books for marketplace orders; quantities stay within what the warehouse
+  // can still reserve, except S2's kettles
+  "listings": [
+    { "sku": "COF-ESP-1KG", "title": "Espresso Coffee Beans, 1 kg", "price": "24.00", "quantity": 60 },
+    { "sku": "COF-DEC-1KG", "title": "Decaf Coffee Beans, 1 kg", "price": "22.00", "quantity": 10 },
+    { "sku": "TEA-GRN-100", "title": "Green Tea, 100 Bags", "price": "9.50", "quantity": 20 },
+    { "sku": "TEA-BLK-100", "title": "Black Tea, 100 Bags", "price": "8.50", "quantity": 50 },
+    // sold out: every home grinder is reserved
+    { "sku": "GRN-HOME", "title": "Home Coffee Grinder", "price": "129.00", "quantity": 0 },
+    { "sku": "GRN-PRO", "title": "Professional Coffee Grinder", "price": "640.00", "quantity": 2 },
+    // sold out until the frother pallet in receiving is put away
+    { "sku": "FRT-ELEC", "title": "Electric Milk Frother", "price": "39.00", "quantity": 0 },
+    // S2: offers 25 kettles; the warehouse has none left to reserve.
+    { "sku": "KET-GOOSE", "title": "Gooseneck Pour-Over Kettle", "price": "59.00", "quantity": 25 },
+    { "sku": "FLT-V60-100", "title": "V60 Paper Filters, 100 pcs", "price": "6.50", "quantity": 30 },
+    { "sku": "SYR-VAN", "title": "Vanilla Syrup, 1 l", "price": "11.00", "quantity": 20 },
+  ],
+}

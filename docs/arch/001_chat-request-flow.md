@@ -177,8 +177,8 @@ remains the exact merged form of the stream.
 4. **`compile()`** turns the description into a runnable (`invoke` / `astream`). One compiled graph
    serves all requests concurrently, because each `astream()` call carries its own run state. That's why
    it lives once in `app.state`.
-   `with_config(recursion_limit=RECURSION_LIMIT)` (25 supersteps: 11 tool rounds plus the answer) caps a looping agent.
-   LangGraph 1.2's default is 10007.
+   `with_config(recursion_limit=...)` caps a looping agent: `AGENT_RECURSION_LIMIT`, 25 supersteps by default (11 tool
+   rounds plus the answer). LangGraph 1.2's default is 10007.
 5. **`bind_tools`** only attaches the tools' JSON schemas to the request. The model *asks* for a call;
    the graph executes it.
 6. **Checkpointer and threads.** `compile(checkpointer=InMemorySaver())` saves the state after every step under
@@ -201,7 +201,8 @@ remains the exact merged form of the stream.
   is skipped with a warning. The graph factory is async because of this; the tool list is fixed until restart.
   MCP tool errors (`is_error`) arrive as `ToolMessage(status="error")` with the server's message.
 - `settings.py`: `LLMSettings` reads `LLM_*` env. The URL is validated, the model is non-empty, and the
-  key is a `SecretStr`.
+  key is a `SecretStr`. `AgentSettings` reads `AGENT_*`: the system prompt from `AGENT_SYSTEM_PROMPT_FILE` (a
+  deployment swaps the agent's role without touching code; the demo mounts one, spec 011) and the recursion limit.
 - `agent/llm.py`: `ChatDeepSeek` (langchain-deepseek) pointed at the OpenAI-compatible RouterAI `base_url`. It's a
   `BaseChatOpenAI` subclass on the `openai` SDK. Unlike `ChatOpenAI`, which drops non-standard fields, it lifts
   RouterAI's OpenRouter-style `delta.reasoning` into `additional_kwargs["reasoning_content"]`. Provider errors

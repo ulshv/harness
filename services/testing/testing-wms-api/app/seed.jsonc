@@ -1,0 +1,135 @@
+// The CoffeeSupplies LLC warehouse (spec 011). Rows of a demo scenario carry a comment naming it (S1–S5);
+// the rest is background. Times are offsets from startup: "-2d" is two days before the service started.
+// Reserved stock isn't stored: it's the sum of order allocations at each SKU and location.
+{
+  "products": [
+    { "sku": "COF-ESP-1KG", "name": "Espresso beans, 1 kg" },
+    { "sku": "COF-HOU-1KG", "name": "House blend beans, 1 kg" },
+    { "sku": "COF-DEC-1KG", "name": "Decaf beans, 1 kg" },
+    { "sku": "TEA-GRN-100", "name": "Green tea, 100 bags" },
+    { "sku": "TEA-BLK-100", "name": "Black tea, 100 bags" },
+    { "sku": "GRN-PRO", "name": "Professional coffee grinder" },
+    { "sku": "GRN-HOME", "name": "Home coffee grinder" },
+    { "sku": "FRT-ELEC", "name": "Electric milk frother" },
+    { "sku": "KET-GOOSE", "name": "Gooseneck kettle" },
+    { "sku": "FLT-V60-100", "name": "V60 paper filters, 100 pcs" },
+    { "sku": "CUP-PAP-8OZ", "name": "Paper cups 8 oz, 1000 pcs" },
+    { "sku": "LID-8OZ", "name": "Cup lids 8 oz, 1000 pcs" },
+    { "sku": "SYR-VAN", "name": "Vanilla syrup, 1 l" },
+  ],
+
+  // receiving dock, pallet reserve, pick face, dispatch; only PICK and BULK stock can be reserved
+  "locations": [
+    "RECV-01", "RECV-02",
+    "BULK-A-01", "BULK-A-02", "BULK-A-03", "BULK-A-04",
+    "PICK-A-01", "PICK-A-02", "PICK-A-03", "PICK-A-04", "PICK-A-05", "PICK-A-06",
+    "PICK-B-01", "PICK-B-02", "PICK-B-03", "PICK-B-04",
+    "SHIP-01", "SHIP-02",
+  ],
+
+  "stock": [
+    // S3: plenty of espresso beans, so the lost marketplace order can be reserved once it exists here.
+    { "sku": "COF-ESP-1KG", "location": "PICK-A-01", "on_hand": 30 },
+    { "sku": "COF-ESP-1KG", "location": "BULK-A-01", "on_hand": 120 },
+    // S4: all the house blend there is; OUT-5045 holds it and still needs 25 more.
+    { "sku": "COF-HOU-1KG", "location": "PICK-A-02", "on_hand": 15 },
+    { "sku": "COF-DEC-1KG", "location": "PICK-A-03", "on_hand": 24 },
+    { "sku": "TEA-GRN-100", "location": "PICK-A-04", "on_hand": 40 },
+    { "sku": "TEA-BLK-100", "location": "PICK-A-04", "on_hand": 35 },
+    { "sku": "TEA-BLK-100", "location": "BULK-A-03", "on_hand": 100 },
+    // S1: every home grinder is held by Hotel Aurora's order OUT-5041.
+    { "sku": "GRN-HOME", "location": "PICK-A-05", "on_hand": 10 },
+    { "sku": "GRN-PRO", "location": "PICK-A-06", "on_hand": 4 },
+    { "sku": "SYR-VAN", "location": "PICK-B-01", "on_hand": 30 },
+    { "sku": "SYR-VAN", "location": "BULK-A-04", "on_hand": 48 },
+    // S5: two frothers on the pick face, both held by OUT-5048.
+    { "sku": "FRT-ELEC", "location": "PICK-B-02", "on_hand": 2 },
+    // S5: a pallet of frothers waiting in receiving for two days; it can't be reserved until it's put away.
+    { "sku": "FRT-ELEC", "location": "RECV-01", "on_hand": 48, "received_at": "-2d" },
+    // S2: the last two kettles, held by the marketplace order behind OUT-5050.
+    { "sku": "KET-GOOSE", "location": "PICK-B-03", "on_hand": 2 },
+    { "sku": "FLT-V60-100", "location": "PICK-B-04", "on_hand": 60 },
+    { "sku": "CUP-PAP-8OZ", "location": "BULK-A-02", "on_hand": 40 },
+    { "sku": "LID-8OZ", "location": "BULK-A-02", "on_hand": 40 },
+  ],
+
+  "orders": [
+    // shipped: the goods have left, so no allocations
+    {
+      "id": "OUT-5030", "ref": "SO-1030", "customer": "Blue Harbor Café", "status": "shipped",
+      "lines": [{ "sku": "COF-HOU-1KG", "qty": 30 }, { "sku": "CUP-PAP-8OZ", "qty": 4 }],
+    },
+    {
+      "id": "OUT-5031", "ref": "SO-1031", "customer": "Hotel Aurora", "status": "shipped",
+      "lines": [{ "sku": "TEA-BLK-100", "qty": 10 }, { "sku": "SYR-VAN", "qty": 6 }],
+    },
+    {
+      "id": "OUT-5032", "ref": "SO-1032", "customer": "Marketplace buyers", "status": "shipped",
+      "lines": [{ "sku": "GRN-HOME", "qty": 1 }],
+    },
+    {
+      "id": "OUT-5033", "ref": "SO-1033", "customer": "Olivia Grant", "status": "shipped",
+      "lines": [{ "sku": "KET-GOOSE", "qty": 1 }, { "sku": "FLT-V60-100", "qty": 2 }],
+    },
+    {
+      "id": "OUT-5034", "ref": "SO-1034", "customer": "Corner Bakery", "status": "reserved",
+      "lines": [
+        { "sku": "COF-ESP-1KG", "qty": 20, "allocations": [{ "location": "PICK-A-01", "qty": 20 }] },
+        { "sku": "CUP-PAP-8OZ", "qty": 2, "allocations": [{ "location": "BULK-A-02", "qty": 2 }] },
+        { "sku": "LID-8OZ", "qty": 2, "allocations": [{ "location": "BULK-A-02", "qty": 2 }] },
+      ],
+    },
+    {
+      "id": "OUT-5035", "ref": "SO-1035", "customer": "Marketplace buyers", "status": "reserved",
+      "lines": [{ "sku": "TEA-GRN-100", "qty": 2, "allocations": [{ "location": "PICK-A-04", "qty": 2 }] }],
+    },
+    {
+      "id": "OUT-5036", "ref": "SO-1036", "customer": "Lucas Meyer", "status": "reserved",
+      "lines": [{ "sku": "GRN-PRO", "qty": 1, "allocations": [{ "location": "PICK-A-06", "qty": 1 }] }],
+    },
+    {
+      "id": "OUT-5037", "ref": "SO-1037", "customer": "Hotel Aurora", "status": "reserved",
+      "lines": [
+        { "sku": "SYR-VAN", "qty": 12, "allocations": [{ "location": "PICK-B-01", "qty": 12 }] },
+        { "sku": "TEA-GRN-100", "qty": 6, "allocations": [{ "location": "PICK-A-04", "qty": 6 }] },
+      ],
+    },
+    {
+      "id": "OUT-5038", "ref": "SO-1038", "customer": "Marketplace buyers", "status": "reserved",
+      "lines": [{ "sku": "FLT-V60-100", "qty": 3, "allocations": [{ "location": "PICK-B-04", "qty": 3 }] }],
+    },
+    {
+      "id": "OUT-5039", "ref": "SO-1039", "customer": "Corner Bakery", "status": "reserved",
+      "lines": [{ "sku": "COF-DEC-1KG", "qty": 8, "allocations": [{ "location": "PICK-A-03", "qty": 8 }] }],
+    },
+    {
+      "id": "OUT-5040", "ref": "SO-1040", "customer": "Marketplace buyers", "status": "reserved",
+      "lines": [{ "sku": "COF-ESP-1KG", "qty": 2, "allocations": [{ "location": "PICK-A-01", "qty": 2 }] }],
+    },
+    // S1: Hotel Aurora's grinders, delivery in 5 days, invoice 12 days overdue in the ERP; holds all 10.
+    {
+      "id": "OUT-5041", "ref": "SO-1041", "customer": "Hotel Aurora", "status": "reserved",
+      "lines": [{ "sku": "GRN-HOME", "qty": 10, "allocations": [{ "location": "PICK-A-05", "qty": 10 }] }],
+    },
+    // S4: Blue Harbor Café's delivery tomorrow, short 25 until purchase order PO-2207 arrives.
+    {
+      "id": "OUT-5045", "ref": "SO-1045", "customer": "Blue Harbor Café", "status": "partially_reserved",
+      "lines": [{ "sku": "COF-HOU-1KG", "qty": 40, "allocations": [{ "location": "PICK-A-02", "qty": 15 }] }],
+    },
+    // S5: a paid web shop order for tomorrow, 4 frothers short while 48 sit in receiving.
+    {
+      "id": "OUT-5048", "ref": "SO-1048", "customer": "Emma Schulz", "status": "partially_reserved",
+      "lines": [{ "sku": "FRT-ELEC", "qty": 6, "allocations": [{ "location": "PICK-B-02", "qty": 2 }] }],
+    },
+    // S2: the marketplace order that took the last two kettles.
+    {
+      "id": "OUT-5050", "ref": "SO-1050", "customer": "Marketplace buyers", "status": "reserved",
+      "lines": [{ "sku": "KET-GOOSE", "qty": 2, "allocations": [{ "location": "PICK-B-03", "qty": 2 }] }],
+    },
+    // S1: the marketplace order due in 6 hours; nothing reserved, the grinders are all held by OUT-5041.
+    {
+      "id": "OUT-5052", "ref": "SO-1052", "customer": "Marketplace buyers", "status": "new",
+      "lines": [{ "sku": "GRN-HOME", "qty": 6 }],
+    },
+  ],
+}

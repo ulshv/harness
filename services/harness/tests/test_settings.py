@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.settings import McpSettings, load_llm_settings
+from app.settings import AgentSettings, McpSettings, load_llm_settings
 
 VALID_ENV = {
     "LLM_BASE_URL": "https://llm.example/v1",
@@ -63,3 +63,36 @@ def test_invalid_mcp_servers_fail(monkeypatch, value):
 
     with pytest.raises(ValidationError):
         McpSettings()
+
+
+def test_agent_defaults(monkeypatch):
+    monkeypatch.delenv("AGENT_SYSTEM_PROMPT_FILE", raising=False)
+    monkeypatch.delenv("AGENT_RECURSION_LIMIT", raising=False)
+
+    settings = AgentSettings()
+
+    assert (
+        settings.system_prompt()
+        == "You are a concise assistant. Use tools when they help."
+    )
+    assert settings.recursion_limit == 25
+
+
+def test_agent_prompt_from_file(monkeypatch, tmp_path):
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text("You are the operations assistant.")
+    monkeypatch.setenv("AGENT_SYSTEM_PROMPT_FILE", str(prompt))
+    monkeypatch.setenv("AGENT_RECURSION_LIMIT", "61")
+
+    settings = AgentSettings()
+
+    assert settings.system_prompt() == "You are the operations assistant."
+    assert settings.recursion_limit == 61
+
+
+@pytest.mark.parametrize("value", ["", "/nope/prompt.md"])
+def test_bad_prompt_file_fails(monkeypatch, value):
+    monkeypatch.setenv("AGENT_SYSTEM_PROMPT_FILE", value)
+
+    with pytest.raises(ValidationError):
+        AgentSettings()

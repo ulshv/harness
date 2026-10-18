@@ -1,0 +1,235 @@
+# The CoffeeSupplies demo world (spec 011): testing systems the agent works across.
+# Merged over compose.yaml by `make up:demo`; plain `make up` runs harness without them.
+services:
+  # merged into compose.yaml's harness: these keys are added to it, the rest stays
+  harness:
+    environment:
+      # dev wiring, not a secret: each server's tools join the agent as <name>_<tool>
+      MCP_SERVERS: >-
+        {
+          "wms": "http://testing-wms-mcp:8101/mcp",
+          "erp": "http://testing-erp-mcp:8111/mcp",
+          "marketplace": "http://testing-marketplace-mcp:8121/mcp",
+          "chat": "http://testing-chat-mcp:8131/mcp"
+        }
+      # read once at startup: after editing the prompt, `docker compose restart harness`
+      AGENT_SYSTEM_PROMPT_FILE: /etc/harness/system-prompt.md
+      # one investigation walks four systems
+      AGENT_RECURSION_LIMIT: "100"
+    volumes:
+      - ./services/testing/demo-system-prompt.md:/etc/harness/system-prompt.md:ro
+    depends_on:
+      # tools load at startup; a dead server would only be skipped, but the demo needs them all
+      testing-wms-mcp:
+        condition: service_healthy
+      testing-erp-mcp:
+        condition: service_healthy
+      testing-marketplace-mcp:
+        condition: service_healthy
+      testing-chat-mcp:
+        condition: service_healthy
+
+  # warehouse API (specs 006, 011): an in-memory store loaded from seed.jsonc; a restart resets it
+  testing-wms-api:
+    build: ./services/testing/testing-wms-api
+    # no --workers: the store lives in process memory; any .py reload resets it to the seed
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload --reload-dir app
+    ports:
+      - "127.0.0.1:8100:8100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        # seed.jsonc is synced too, but only .py edits reload the app (and with it the seed)
+        - action: sync
+          path: ./services/testing/testing-wms-api/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing/testing-wms-api/uv.lock
+        - action: rebuild
+          path: ./services/testing/testing-wms-api/pyproject.toml
+
+  # MCP server over testing-wms-api (spec 007): a thin adapter, no state of its own
+  testing-wms-mcp:
+    build: ./services/testing/testing-wms-mcp
+    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8101 --reload --reload-dir app
+    environment:
+      # compose's network gives every service its name as a hostname
+      WMS_URL: http://testing-wms-api:8100
+    ports:
+      - "127.0.0.1:8101:8101"
+    depends_on:
+      testing-wms-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8101/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        - action: sync
+          path: ./services/testing/testing-wms-mcp/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing/testing-wms-mcp/uv.lock
+        - action: rebuild
+          path: ./services/testing/testing-wms-mcp/pyproject.toml
+
+  # ERP API (spec 011): customers, sales and purchase orders; in memory, like testing-wms-api
+  testing-erp-api:
+    build: ./services/testing/testing-erp-api
+    # no --workers: the store lives in process memory; any .py reload resets it to the seed
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8110 --reload --reload-dir app
+    ports:
+      - "127.0.0.1:8110:8110"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8110/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        # seed.jsonc is synced too, but only .py edits reload the app (and with it the seed)
+        - action: sync
+          path: ./services/testing/testing-erp-api/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing/testing-erp-api/uv.lock
+        - action: rebuild
+          path: ./services/testing/testing-erp-api/pyproject.toml
+
+  # MCP server over testing-erp-api, the same thin adapter as testing-wms-mcp
+  testing-erp-mcp:
+    build: ./services/testing/testing-erp-mcp
+    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8111 --reload --reload-dir app
+    environment:
+      ERP_URL: http://testing-erp-api:8110
+    ports:
+      - "127.0.0.1:8111:8111"
+    depends_on:
+      testing-erp-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8111/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        - action: sync
+          path: ./services/testing/testing-erp-mcp/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing/testing-erp-mcp/uv.lock
+        - action: rebuild
+          path: ./services/testing/testing-erp-mcp/pyproject.toml
+
+  # marketplace API (spec 011): the seller's orders and listings; in memory, like testing-wms-api
+  testing-marketplace-api:
+    build: ./services/testing/testing-marketplace-api
+    # no --workers: the store lives in process memory; any .py reload resets it to the seed
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8120 --reload --reload-dir app
+    ports:
+      - "127.0.0.1:8120:8120"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8120/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        # seed.jsonc is synced too, but only .py edits reload the app (and with it the seed)
+        - action: sync
+          path: ./services/testing/testing-marketplace-api/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing/testing-marketplace-api/uv.lock
+        - action: rebuild
+          path: ./services/testing/testing-marketplace-api/pyproject.toml
+
+  # MCP server over testing-marketplace-api, the same thin adapter as testing-wms-mcp
+  testing-marketplace-mcp:
+    build: ./services/testing/testing-marketplace-mcp
+    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8121 --reload --reload-dir app
+    environment:
+      MARKETPLACE_URL: http://testing-marketplace-api:8120
+    ports:
+      - "127.0.0.1:8121:8121"
+    depends_on:
+      testing-marketplace-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8121/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        - action: sync
+          path: ./services/testing/testing-marketplace-mcp/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing/testing-marketplace-mcp/uv.lock
+        - action: rebuild
+          path: ./services/testing/testing-marketplace-mcp/pyproject.toml
+
+  # team chat API (spec 011): people, channels, messages; in memory, like testing-wms-api
+  testing-chat-api:
+    build: ./services/testing/testing-chat-api
+    # no --workers: the store lives in process memory; any .py reload resets it to the seed
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8130 --reload --reload-dir app
+    ports:
+      - "127.0.0.1:8130:8130"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8130/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        # seed.jsonc is synced too, but only .py edits reload the app (and with it the seed)
+        - action: sync
+          path: ./services/testing/testing-chat-api/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing/testing-chat-api/uv.lock
+        - action: rebuild
+          path: ./services/testing/testing-chat-api/pyproject.toml
+
+  # MCP server over testing-chat-api, the same thin adapter as testing-wms-mcp
+  testing-chat-mcp:
+    build: ./services/testing/testing-chat-mcp
+    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8131 --reload --reload-dir app
+    environment:
+      CHAT_URL: http://testing-chat-api:8130
+    ports:
+      - "127.0.0.1:8131:8131"
+    depends_on:
+      testing-chat-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8131/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        - action: sync
+          path: ./services/testing/testing-chat-mcp/app
+          target: /app/app
+        - action: rebuild
+          path: ./services/testing/testing-chat-mcp/uv.lock
+        - action: rebuild
+          path: ./services/testing/testing-chat-mcp/pyproject.toml

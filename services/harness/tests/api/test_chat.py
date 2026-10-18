@@ -129,7 +129,7 @@ def test_stream_error_before_any_event(make_client):
 
 
 def test_stream_reports_an_endless_tool_loop(make_client):
-    # more tool rounds than RECURSION_LIMIT=25 lets through (11 rounds + the answer)
+    # more tool rounds than DEFAULT_RECURSION_LIMIT=25 lets through (11 rounds + the answer)
     endless = [call_tool() for _ in range(30)]
 
     resp = make_client(endless).post("/chat/stream", json={"message": "loop"})
