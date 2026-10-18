@@ -1,8 +1,10 @@
+import asyncio
 import json
 
 import pytest
 from langchain_core.exceptions import ModelConnectionError
 from langchain_core.messages import AIMessage
+from langchain_core.tools import tool
 
 from tests.conftest import StreamingFakeModel
 
@@ -48,6 +50,39 @@ def test_stream_tool_call_then_answer(make_client):
     assert events[2][1] == {"text": "It is noon."}
     assert events[3][1] == {}
     assert all("type" not in data for _, data in events)
+
+
+@tool
+async def slow_lookup() -> str:
+    """Answers after a while."""
+    await asyncio.sleep(0.2)
+    return "slow"
+
+
+@tool
+async def fast_lookup() -> str:
+    """Answers at once."""
+    return "fast"
+
+
+def test_parallel_tool_results_stream_as_each_one_finishes(make_client):
+    calls = AIMessage(
+        "",
+        tool_calls=[
+            {"name": "slow_lookup", "args": {}, "id": "call_slow"},
+            {"name": "fast_lookup", "args": {}, "id": "call_fast"},
+        ],
+    )
+    client = make_client([calls, AIMessage("Done.")], tools=[slow_lookup, fast_lookup])
+
+    events = client.post("/chat/invoke", json={"message": "both"}).json()["events"]
+
+    assert [(e["type"], e.get("id") or e.get("tool_call_id")) for e in events[:4]] == [
+        ("tool_call", "call_slow"),
+        ("tool_call", "call_fast"),
+        ("tool_result", "call_fast"),
+        ("tool_result", "call_slow"),
+    ]
 
 
 def test_invoke_returns_the_whole_run(make_client):

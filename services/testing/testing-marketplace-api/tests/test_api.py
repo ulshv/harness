@@ -1,3 +1,10 @@
+import time
+
+from fastapi.testclient import TestClient
+
+from app.main import create_app
+
+
 def test_the_order_due_in_six_hours(client):
     order = client.get("/orders/114-3349201").json()
 
@@ -43,3 +50,12 @@ def test_listing_errors(client):
 def test_listings_and_state(client):
     assert len(client.get("/listings").json()) == 10
     assert sorted(client.get("/_state").json()) == ["listings", "orders"]
+
+
+def test_latency_delays_every_response():
+    client = TestClient(create_app(latency=(0.2, 0.2)))
+
+    started = time.monotonic()
+    client.get("/health")
+
+    assert time.monotonic() - started >= 0.2

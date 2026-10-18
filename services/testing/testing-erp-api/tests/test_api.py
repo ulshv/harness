@@ -1,4 +1,9 @@
+import time
 from datetime import UTC, datetime, timedelta
+
+from fastapi.testclient import TestClient
+
+from app.main import create_app
 
 NEW_ORDER = {
     "customer_id": "CUST-007",
@@ -137,3 +142,12 @@ def test_create_validation(client):
 
     assert client.post("/sales-orders", json=naive).status_code == 422
     assert client.post("/sales-orders", json=no_id).status_code == 422
+
+
+def test_latency_delays_every_response():
+    client = TestClient(create_app(latency=(0.2, 0.2)))
+
+    started = time.monotonic()
+    client.get("/health")
+
+    assert time.monotonic() - started >= 0.2

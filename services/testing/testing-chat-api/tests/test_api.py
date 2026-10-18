@@ -1,3 +1,10 @@
+import time
+
+from fastapi.testclient import TestClient
+
+from app.main import create_app
+
+
 def test_seeded_history_in_a_channel(client):
     warehouse = client.get("/messages", params={"to": "#warehouse"}).json()
 
@@ -69,3 +76,12 @@ def test_people_and_channels(client):
         "#purchasing",
     ]
     assert sorted(client.get("/_state").json()) == ["channels", "messages", "users"]
+
+
+def test_latency_delays_every_response():
+    client = TestClient(create_app(latency=(0.2, 0.2)))
+
+    started = time.monotonic()
+    client.get("/health")
+
+    assert time.monotonic() - started >= 0.2

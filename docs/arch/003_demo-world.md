@@ -44,7 +44,9 @@ Each pair copies the 006/007 pattern: an API with thin routes over a store that 
 uvicorn worker and `async def` handlers (no locks), domain errors mapped to 404/409 with messages written for the
 model; an MCP server (`mcp` 2.3.0, stateless Streamable HTTP) with one tool per endpoint that returns the API's
 body verbatim and turns API errors into `ToolError`. Every API has `GET /_state`; the MCP servers don't expose it.
-The WMS also answers after a random 0.1–0.5 s (`LATENCY_SECONDS`, history 010.4), like a real backend would.
+Every API answers after a random 0.1–0.5 s (`LATENCY_SECONDS` in its `app/main.py`, from history 010.4), like a real
+backend would: the chat's spinners show, and parallel tool results come back out of order. Tests build the apps
+without it.
 
 ## Time and reset
 
