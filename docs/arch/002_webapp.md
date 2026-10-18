@@ -81,8 +81,10 @@ note.
 
 A tool step is `✓ wms_get_stock(sku: "TAPE-48")`: a spinner until the result, then ✓ or ✗; a call that never
 got a result (the turn ended in an error or a dropped stream) shows `–` instead of spinning forever. The result
-(pretty JSON when it parses) sits behind a native `<details>`. Reasoning is muted italics, an interim note plain
-text. A whitespace-only text part doesn't start an answer.
+(pretty JSON when it parses) sits behind a native `<details>`. A reasoning part folds the same way: `Thinking…`
+with a spinner while it's the newest step of a live block, `✓ Thinking` once anything follows it (reasoning has
+no end event), the muted italic text behind the toggle. An interim note is plain text. A whitespace-only text
+part doesn't start an answer.
 
 `TailScroll` decides "the user let go" from the scroll **direction**: its own `scrollTop` assignment fires the
 scroll event a frame later, and content that grew in between would look like "not at the bottom". Growth never

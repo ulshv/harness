@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Spinner } from "../components/Spinner";
 import { TailScroll } from "../components/TailScroll";
 import { describeActivity, type Part, type ToolPart } from "../chat/turn";
@@ -10,7 +10,9 @@ const ACTIVITY_MAX_LINES = 6;
 // answer starts (or the turn ends) it folds into one line that expands on click.
 export function Activity({ parts, live }: { parts: Part[]; live: boolean }) {
   const [open, setOpen] = useState(false);
-  const steps = parts.map((part, i) => <Step key={i} part={part} live={live} />);
+  const steps = parts.map((part, i) => (
+    <Step key={i} part={part} live={live} last={i === parts.length - 1} />
+  ));
 
   return (
     <section className="rounded-lg border border-border bg-surface text-sm">
@@ -44,10 +46,10 @@ export function Activity({ parts, live }: { parts: Part[]; live: boolean }) {
   );
 }
 
-function Step({ part, live }: { part: Part; live: boolean }) {
+function Step({ part, live, last }: { part: Part; live: boolean; last: boolean }) {
   switch (part.kind) {
     case "reasoning":
-      return <p className="whitespace-pre-wrap text-muted italic">{part.text}</p>;
+      return <ReasoningStep text={part.text} thinking={live && last} />;
     case "text":
       // said before a tool call: an interim note, not the answer
       return <p className="whitespace-pre-wrap">{part.text}</p>;
@@ -56,7 +58,24 @@ function Step({ part, live }: { part: Part; live: boolean }) {
   }
 }
 
-// the call on the summary line; the result behind a native <details> toggle, no state needed
+// Thoughts fold under one line like a tool's result, so the steps stay scannable. Reasoning has no end event:
+// it's over once anything follows it (or the block stops being live)
+function ReasoningStep({ text, thinking }: { text: string; thinking: boolean }) {
+  return (
+    <Disclosure
+      summary={
+        <>
+          {thinking ? <Spinner /> : <span className="w-3 text-success">✓</span>}
+          <span className="text-muted">{thinking ? "Thinking…" : "Thinking"}</span>
+        </>
+      }
+    >
+      <p className="mt-1 mb-2 whitespace-pre-wrap text-muted italic">{text}</p>
+    </Disclosure>
+  );
+}
+
+// the call on the summary line, the result behind the toggle
 function ToolStep({ tool, live }: { tool: ToolPart; live: boolean }) {
   const call = (
     <>
@@ -76,17 +95,26 @@ function ToolStep({ tool, live }: { tool: ToolPart; live: boolean }) {
   }
 
   return (
+    <Disclosure summary={call}>
+      <pre className="mt-1 mb-2 overflow-x-auto rounded bg-bg p-2 text-xs">
+        {prettyJson(tool.result.content)}
+      </pre>
+    </Disclosure>
+  );
+}
+
+// a step whose details open on click: a native <details> toggle, no state needed
+function Disclosure({ summary, children }: { summary: ReactNode; children: ReactNode }) {
+  return (
     <details className="group">
       {/* a flex <summary> loses the native marker (and Safari's needs hiding), so it draws its own */}
       <summary className="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
         <span aria-hidden className="w-3 text-muted transition-transform group-open:rotate-90">
           ▸
         </span>
-        {call}
+        {summary}
       </summary>
-      <pre className="mt-1 mb-2 overflow-x-auto rounded bg-bg p-2 text-xs">
-        {prettyJson(tool.result.content)}
-      </pre>
+      {children}
     </details>
   );
 }

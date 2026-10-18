@@ -1,3 +1,10 @@
+import time
+
+from fastapi.testclient import TestClient
+
+from app.main import create_app
+
+
 def move(client, sku="GLV-NIT-L", source="A-01-02", destination="D-01-01", qty=1):
     body = {"sku": sku, "from_location": source, "to_location": destination, "qty": qty}
     return client.post("/moves", json=body)
@@ -176,3 +183,12 @@ def test_state_exposes_the_test_only_flag(client):
     products = client.get("/_state").json()["products"]
 
     assert {p["sku"] for p in products if p["broken"]} == {"SCN-01"}
+
+
+def test_latency_delays_every_response():
+    client = TestClient(create_app(latency=(0.2, 0.2)))
+
+    started = time.monotonic()
+    client.get("/health")
+
+    assert time.monotonic() - started >= 0.2
