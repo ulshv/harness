@@ -2,9 +2,11 @@
 
 **English** · [Русский](README-ru.md)
 
-**An open-source foundation for production AI agents.** The agent runs as a real service with streaming,
-tools, skills, MCP integrations, an admin panel and grown-up auth. It's meant to be the base an enterprise or
-a startup builds its own harness on.
+**An open-source foundation for building AI agents for enterprises and startups.** It includes SSE streaming,
+tools, skills, MCP integration, a web app, an admin panel, a dedicated auth service and more to come! (see [Roadmap](#roadmap))
+
+I've spent the last two years building AI agent harnesses that run in enterprise production. This project is
+how I think the foundation of such a harness should be built.
 
 ![status](https://img.shields.io/badge/status-draft%20%2F%20WIP-orange)
 ![python](https://img.shields.io/badge/python-3.14-3776AB)
@@ -12,7 +14,7 @@ a startup builds its own harness on.
 ![langgraph](https://img.shields.io/badge/LangGraph-1.2-1C3C3C)
 ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 
-**Started:** October 14th, 2026 · **Steps shipped:** [10](docs/history) · **Live demo:** coming soon
+**Started:** October 14th, 2026 · **Steps shipped:** [11](docs/history) · **Live demo:** coming soon
 
 > **Status: draft (work in progress), not a PoC.** Every shipped step is production-grade: layered code,
 > typed contracts, tests, docs and a reviewed design. Features land one at a time.
@@ -23,30 +25,35 @@ Today's coding LLMs write like mid-level developers who ship spaghetti unless so
 Plenty of AI-assisted projects now follow a "spec → plan → AI review" flow. The process alone doesn't
 make the code good. What makes the difference is the craft that goes into it.
 
-I've spent the last two years building AI agent harnesses that run in enterprise production. This repo is
-how I think the foundation of such a harness should be built. AI tools speed up the typing; I review every
-line and rework it until it meets clean-code standards.
+AI tools speed up the typing; I review every line and rework the core until it meets clean-code standards.
 
-## What it's becoming
+Not every line gets the same treatment though... The core (the agent runtime in `services/harness`, the auth service
+in `services/auth`) and the infrastructure go through strict review: I clean up and rework the assistant's code
+until I'd put my name on every line. The supporting code (the chat UI in `services/webapp`, the testing
+warehouse API and its MCP server, unit tests) is reviewed and fixed where it matters, but not polished to the
+same standard: it has to be correct and readable, not elegant.
 
-- **Chat UI and admin panel (React).** Streaming chat with tool calls and reasoning in a spoiler. Admin for
-  skills, integrations, users and roles.
-- **Skills library.** Create and edit agent skills from the admin panel; the agent picks them up without a restart.
-- **Custom tools as plugins.** Extend the agent without touching its core.
-- **External MCP integrations.** A registry of MCP servers with credentials; the agent discovers and calls
-  their tools.
-- **Dictionaries.** Skills stay portable across environments: a skill refers to `{{crm.deal_amount}}`, and each
-  environment's dictionary says what that is there (`cf_12345` in one CRM, `UF_CRM_AMOUNT` in another).
-  One skill, many installations.
-- **Serious auth.** A Go microservice with argon2id passwords, short-lived EdDSA JWTs verified via JWKS,
-  refresh-token rotation, httpOnly cookies, then RBAC. Multi-tenancy and SSO come later.
-- **Event-driven agents.** Beyond chat, external systems such as a CRM or a messenger authenticate with OAuth
-  client credentials or scoped API keys and trigger the agent through webhook endpoints.
-- **RAG.** Knowledge bases managed from the admin panel: ingestion, pgvector in Postgres, hybrid search, and
-  answers with citations. Per tenant.
-- **Memory, deep agents, observability and evals.** Threads in Postgres, planning and subagents. Traces and
-  evals live in one place, Langfuse: datasets built from real production traces, LLM-as-judge scoring, and a
-  regression gate for agent quality.
+## Quick start
+
+Requires Docker with Compose ≥ 2.22, `make`, and [`uv`](https://docs.astral.sh/uv/) for running tests locally.
+
+1. `git clone https://github.com/ulshv/harness.git && cd harness`
+2. `cp .env.example .env`
+3. Fill in the variables: at least `LLM_API_KEY` (any OpenAI-compatible endpoint; defaults: RouterAI + DeepSeek).
+4. `make up` starts all services with hot reload.
+5. Open http://localhost:8080.
+6. Start chatting! Ask the agent what it can do.
+
+The OpenAPI UI is at `localhost:8000/docs`; `make test && make lint` runs the checks.
+
+Under the hood:
+
+- **Streaming chat.** The answer streams in as Markdown; reasoning and tool calls fill a live block that folds
+  into a one-line summary once the answer starts.
+- **A LangGraph ReAct agent** with any OpenAI-compatible provider (default: DeepSeek via RouterAI).
+- **MCP tools.** Tools from MCP servers join the agent at startup; a dead server or a failing tool never kills a run.
+- **One typed event contract** for `/chat/stream` (SSE) and `/chat/invoke` (JSON), published in OpenAPI. Every
+  stream ends with `done` or `error`.
 
 ## Architecture
 
@@ -117,8 +124,8 @@ flowchart TB
 
     classDef shipped fill:#e8f5e9,stroke:#2e7d32,color:#1b1b1b
     classDef planned fill:#fafafa,stroke:#9e9e9e,stroke-dasharray:5 4,color:#424242
-    class chat_api,pipeline,agent,tools,mcp_client,llm,mcp shipped
-    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,memory,rag,auth,pg,idp,obs planned
+    class chat_ui,chat_api,pipeline,agent,tools,mcp_client,llm,mcp shipped
+    class admin_ui,ext_sys,admin_api,hooks,plugins,skills,memory,rag,auth,pg,idp,obs planned
     style clients fill:#ffffff,stroke:#bdbdbd
     style harness fill:#ffffff,stroke:#bdbdbd
     style auth_box fill:#ffffff,stroke:#bdbdbd
@@ -135,6 +142,27 @@ flowchart TB
 
 A deeper walkthrough is in [`docs/arch/001_chat-request-flow.md`](docs/arch/001_chat-request-flow.md).
 
+## What it's becoming
+
+- **Chat UI and admin panel (React).** Streaming chat with tool calls and reasoning in a spoiler. Admin for
+  skills, integrations, users and roles.
+- **Skills library.** Create and edit agent skills from the admin panel; the agent picks them up without a restart.
+- **Custom tools as plugins.** Extend the agent without touching its core.
+- **External MCP integrations.** A registry of MCP servers with credentials; the agent discovers and calls
+  their tools.
+- **Dictionaries.** Skills stay portable across environments: a skill refers to `{{crm.deal_amount}}`, and each
+  environment's dictionary says what that is there (`cf_12345` in one CRM, `UF_CRM_AMOUNT` in another).
+  One skill, many installations.
+- **Serious auth.** A Go microservice with argon2id passwords, short-lived EdDSA JWTs verified via JWKS,
+  refresh-token rotation, httpOnly cookies, then RBAC. Multi-tenancy and SSO come later.
+- **Event-driven agents.** Beyond chat, external systems such as a CRM or a messenger authenticate with OAuth
+  client credentials or scoped API keys and trigger the agent through webhook endpoints.
+- **RAG.** Knowledge bases managed from the admin panel: ingestion, pgvector in Postgres, hybrid search, and
+  answers with citations. Per tenant.
+- **Memory, deep agents, observability and evals.** Threads in Postgres, planning and subagents. Traces and
+  evals live in one place, Langfuse: datasets built from real production traces, LLM-as-judge scoring, and a
+  regression gate for agent quality.
+
 ## Roadmap
 
 **Shipped**
@@ -148,10 +176,10 @@ A deeper walkthrough is in [`docs/arch/001_chat-request-flow.md`](docs/arch/001_
 - [x] Conversations by `thread_id` (in memory for now)
 - [x] MCP client: tools from MCP servers join the agent at startup; a dead server or a failing tool never kills a run
 - [x] A testing warehouse for evals: a REST API with deliberate traps and an MCP server over it
+- [x] React chat: streaming Markdown answer, live reasoning and tool calls, conversations
 
 **Next**, in build order
 
-- [ ] React chat UI: streaming, tool calls, reasoning spoiler
 - [ ] Memory: Postgres checkpointer, conversations survive restarts
 - [ ] Deep agents: planning, virtual filesystem, subagents, with the agent's todo list in the UI
 - [ ] Auth service in Go: argon2id, EdDSA JWT + JWKS, refresh rotation
@@ -174,71 +202,6 @@ A deeper walkthrough is in [`docs/arch/001_chat-request-flow.md`](docs/arch/001_
 
 The foundation stays open source; some enterprise capabilities may ship separately. The working roadmap,
 with the backlog and its reasons, is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-## What it does today
-
-One real request: the model thinks, calls a tool, thinks again with the result, answers, and closes the
-stream explicitly (repeated frames trimmed).
-
-```bash
-curl -N localhost:8000/chat/stream -H 'content-type: application/json' \
-  -d '{"message":"How many minutes are left until midnight UTC?"}'
-```
-
-```
-event: reasoning
-data: {"text":"We need"}
-
-event: reasoning
-data: {"text":" answer needs current time. Use tool."}
-
-event: tool_call
-data: {"id":"call_00_qJxXBvCuuGrvvrCFXHIr9647","name":"current_time","args":{}}
-
-event: tool_result
-data: {"tool_call_id":"call_00_qJxXBvCuuGrvvrCFXHIr9647","name":"current_time","content":"2026-10-14T20:04:19+00:00","status":"success"}
-
-event: reasoning
-data: {"text":"Current time"}
-
-… 6 more reasoning frames: the model does the arithmetic
-
-event: text
-data: {"text":"At 20:04:19 UTC, there are **"}
-
-… 3 more text frames
-
-event: done
-data: {}
-```
-
-- **A LangGraph ReAct agent** behind FastAPI, with any OpenAI-compatible provider. The default is DeepSeek
-  via RouterAI.
-- **One event pipeline, two endpoints.** `/chat/stream` sends SSE; `/chat/invoke` returns the same events
-  merged into one JSON response. That makes tests exact and keeps the UI and the API honest with each other.
-- **Typed event contract** (`reasoning`, `text`, `tool_call`, `tool_result`, `done`, `error`) published as
-  a discriminated union in OpenAPI, ready for a generated frontend client.
-- **Live reasoning.** Time to the first frame dropped from ~11.6 s of silence to ~1.4 s.
-- **MCP tools.** `MCP_SERVERS` lists servers; their tools join the agent as `<server>_<tool>`. A server down at
-  startup is skipped, a tool that fails mid-run becomes an error result (`tool_result.status`), and the run goes on.
-- **Safe failures.** Every stream ends with `done` or `error`. Error codes separate retryable provider
-  outages from our own misconfiguration, and details stay in the logs.
-- **A dev loop that just works.** `make up` starts Docker Compose with hot reload; `make test` and
-  `make lint` run the checks. Unit tests use deterministic fake models; the live model runs only in smoke tests.
-
-## Quick start
-
-Requires Docker with Compose ≥ 2.22, `make`, and [`uv`](https://docs.astral.sh/uv/) for running tests locally.
-
-```bash
-git clone https://github.com/ulshv/harness.git && cd harness
-cp .env.example .env        # set LLM_API_KEY (any OpenAI-compatible endpoint; defaults: RouterAI + DeepSeek)
-make up                     # docker compose up --watch --build: edit code, the service reloads
-curl -N localhost:8000/chat/stream -H 'content-type: application/json' -d '{"message":"hi"}'
-make test && make lint
-```
-
-The OpenAPI UI is at `localhost:8000/docs`.
 
 ## How it's built
 

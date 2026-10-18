@@ -26,9 +26,9 @@
   <!-- clients -->
   <rect class="frame" x="20" y="20" width="860" height="100" rx="10"/>
   <text class="frame-title" x="34" y="42">Clients</text>
-  <rect class="planned" x="60" y="52" width="220" height="52" rx="7"/>
-  <text class="t planned-t" x="170.0" y="75.0">Chat UI</text>
-  <text class="s planned-s" x="170.0" y="91.0">React · streaming</text>
+  <rect class="shipped" x="60" y="52" width="220" height="52" rx="7"/>
+  <text class="t shipped-t" x="170.0" y="75.0">Chat UI</text>
+  <text class="s shipped-s" x="170.0" y="91.0">React · streaming</text>
   <rect class="planned" x="340" y="52" width="220" height="52" rx="7"/>
   <text class="t planned-t" x="450.0" y="75.0">External systems</text>
   <text class="s planned-s" x="450.0" y="91.0">CRM · messengers</text>
