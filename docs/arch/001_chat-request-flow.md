@@ -17,8 +17,9 @@ POST /chat/stream                             POST /chat/invoke
   │                                  ▼
   │            agent/graph.py — the agent (ReAct loop)
   │            START → [agent] ── LLM: "I want to call wms_get_order"
-  │                       │ tools_condition: any tool_calls?
-  │                       ├─ yes → [tools] runs it: built-in, or wms_* → MCP server → back to [agent]
+  │                       │ send_tool_calls: any tool_calls?
+  │                       ├─ yes → one [tools] task per call, in parallel: built-in, or wms_* → MCP server
+  │                       │        → back to [agent] once all are done
   │                       └─ no  → END
   ▼                                             ▼
   append_error_or_done ── api/chat/outcome.py: + done on success, exception → error
@@ -57,7 +58,7 @@ message type.
 | the LLM produced another piece of text | `messages` | `_chunk_events`, `case {"type": "text"}` | `TextEvent` |
 | the LLM produced another piece of reasoning | `messages` | `_chunk_events`, `case {"type": "reasoning"}` | `ReasoningEvent` |
 | `agent` finished, the reply has `tool_calls` | `updates` | `_update_events` → `_message_events`, `case AIMessage()` | `ToolCallEvent` |
-| `tools` returned a `ToolMessage` | `updates` | `_message_events`, `case ToolMessage()` | `ToolResultEvent` |
+| a `tools` task returned its `ToolMessage` | `updates` | `_message_events`, `case ToolMessage()` | `ToolResultEvent`, as soon as that call is done |
 
 `_chunk_events` reads `msg.content_blocks`, langchain-core's provider-neutral view of a message: text
 becomes `{"type": "text"}`, and `additional_kwargs["reasoning_content"]` becomes `{"type": "reasoning"}`
@@ -167,13 +168,15 @@ remains the exact merged form of the stream.
 1. **State and reducer.** The graph state is `{"messages": [...]}` (`MessagesState`). A node returns
    only *new* messages, and the `add_messages` reducer appends them to the list.
 2. **A node is a plain function.** It takes the state and returns a partial update. `agent` calls the
-   LLM (the system prompt is prepended per call, not stored in state). `ToolNode` executes every tool
-   call of the last AI message and answers each with a `ToolMessage(tool_call_id=...)`. A tool that raises is
+   LLM (the system prompt is prepended per call, not stored in state). `ToolNode` executes the tool call
+   it's given and answers it with a `ToolMessage(tool_call_id=...)`. A tool that raises is
    answered too: `handle_tool_errors` (`agent/errors.py`) keeps a bad-argument error's details for the model
    and turns anything else into a fixed "The tool failed to run." (traceback to the log), with
    `status="error"`, which `tool_result` carries.
-3. **Edges.** `tools → agent` is a normal edge and always fires. `tools_condition` is a conditional edge:
-   tool calls → `tools`, none → `END`. Together they form the ReAct loop.
+3. **Edges.** `tools → agent` is a normal edge and always fires. `send_tool_calls` is a conditional edge:
+   no tool calls → `END`, otherwise a `Send("tools", ...)` per call. The sends run as parallel tasks of one step,
+   and `updates` reports each task as it finishes, so a fast result reaches the client before a slow one; `agent`
+   runs again once the whole step is done. Together they form the ReAct loop.
 4. **`compile()`** turns the description into a runnable (`invoke` / `astream`). One compiled graph
    serves all requests concurrently, because each `astream()` call carries its own run state. That's why
    it lives once in `app.state`.

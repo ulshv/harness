@@ -19,14 +19,14 @@ type GraphFactory = Callable[[], Awaitable[CompiledStateGraph]]
 async def default_graph() -> CompiledStateGraph:
     # settings first: a bad .env or prompt path fails the boot before any wait on MCP servers
     model = make_model(load_llm_settings())
-    agent = AgentSettings()
-    system_prompt = agent.system_prompt()
+    settings = AgentSettings()
+    system_prompt = settings.system_prompt()
     mcp_tools = await load_mcp_tools(McpSettings().servers)
     return build_graph(
         model,
         [*TOOLS, *mcp_tools],
         system_prompt=system_prompt,
-        recursion_limit=agent.recursion_limit,
+        recursion_limit=settings.recursion_limit,
     )
 
 

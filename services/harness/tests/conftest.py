@@ -78,7 +78,9 @@ def make_client() -> Iterator[ClientFactory]:
                 model = FakeToolModel(responses=model)
 
             async def graph() -> CompiledStateGraph:
-                return build_graph(model, tools)
+                return build_graph(
+                    model, tools, system_prompt="You are a test.", recursion_limit=25
+                )
 
             app = create_app(graph)
             # entering the client runs the app's lifespan, which builds the graph

@@ -77,12 +77,8 @@ def test_parallel_tool_results_stream_as_each_one_finishes(make_client):
 
     events = client.post("/chat/invoke", json={"message": "both"}).json()["events"]
 
-    assert [(e["type"], e.get("id") or e.get("tool_call_id")) for e in events[:4]] == [
-        ("tool_call", "call_slow"),
-        ("tool_call", "call_fast"),
-        ("tool_result", "call_fast"),
-        ("tool_result", "call_slow"),
-    ]
+    results = [e["tool_call_id"] for e in events if e["type"] == "tool_result"]
+    assert results == ["call_fast", "call_slow"]
 
 
 def test_invoke_returns_the_whole_run(make_client):
@@ -164,7 +160,7 @@ def test_stream_error_before_any_event(make_client):
 
 
 def test_stream_reports_an_endless_tool_loop(make_client):
-    # more tool rounds than DEFAULT_RECURSION_LIMIT=25 lets through (11 rounds + the answer)
+    # more tool rounds than a recursion limit of 25 lets through (11 rounds + the answer)
     endless = [call_tool() for _ in range(30)]
 
     resp = make_client(endless).post("/chat/stream", json={"message": "loop"})

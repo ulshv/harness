@@ -3,7 +3,7 @@ from typing import Annotated
 from pydantic import Field, FilePath, HttpUrl, SecretStr, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.agent.graph import DEFAULT_RECURSION_LIMIT, DEFAULT_SYSTEM_PROMPT
+DEFAULT_SYSTEM_PROMPT = "You are a concise assistant. Use tools when they help."
 
 
 class LLMSettings(BaseSettings):
@@ -40,7 +40,8 @@ class AgentSettings(BaseSettings):
 
     # a file, not the text in env: a deployment swaps the agent's role without touching the core
     system_prompt_file: FilePath | None = None
-    recursion_limit: int = Field(default=DEFAULT_RECURSION_LIMIT, ge=1)
+    # LangGraph's own default is 10007 steps; a tool round is 2 (agent + tools), so 25 allows 11 rounds + the answer
+    recursion_limit: int = Field(default=25, ge=1)
 
     def system_prompt(self) -> str:
         if self.system_prompt_file is None:
