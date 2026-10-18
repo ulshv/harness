@@ -1,14 +1,23 @@
-import type { AssistantTurn } from "../chat/turn";
+import { memo } from "react";
+import { Markdown } from "../components/Markdown";
+import { splitTurn, type AssistantTurn } from "../chat/turn";
+import { Activity } from "./Activity";
 
-export function Reply({ turn }: { turn: AssistantTurn }) {
+// memo: every event re-renders the list, but useChat keeps finished turns' identity, so only the streaming
+// reply re-parses its Markdown instead of every answer in the chat
+export const Reply = memo(function Reply({ turn }: { turn: AssistantTurn }) {
+  const { activity, answer } = splitTurn(turn.parts);
+  const streaming = turn.status === "streaming";
+
   return (
-    <div className="flex flex-col gap-1">
-      {turn.text ? (
-        <p className="wrap-break-word whitespace-pre-wrap">{turn.text}</p>
+    <div className="flex flex-col gap-2">
+      {activity.length > 0 && <Activity parts={activity} live={streaming && !answer} />}
+      {answer ? (
+        <Markdown>{answer}</Markdown>
       ) : (
-        turn.status === "streaming" && <p className="text-muted">Working…</p>
+        streaming && activity.length === 0 && <p className="text-muted">Working…</p>
       )}
       {turn.error && <p className="text-sm text-danger">{turn.error}</p>}
     </div>
   );
-}
+});

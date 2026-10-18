@@ -95,6 +95,7 @@ moves very fast, so treat everything you remember from training as outdated unti
 | Vite / React / TypeScript | 8.3.4 / 19.3.1 / 6.0.3 | `services/webapp` (history 010; TS 6 is strict by default; TS 7 is the Go port, not yet supported by tools that use the compiler API) |
 | Tailwind CSS | 4.3.3 (`@tailwindcss/vite`) | `services/webapp` (history 010; configured in CSS, `@theme` tokens) |
 | eventsource-parser | 4.1.2 | `services/webapp` (history 010; SSE over `fetch` POST) |
+| react-markdown / remark-gfm / @tailwindcss/typography | 10.1.0 / 4.0.1 / 0.5.20 | `services/webapp` (history 010.2; the answer as Markdown, `prose` colors mapped to tokens) |
 | Vitest / oxlint / Prettier | 5.0.5 / 1.88.0 / 3.9.10 (+ `prettier-plugin-tailwindcss` 0.8.1) | webapp dev deps |
 | openapi-typescript | 7.13.0 | `make api-types` via `npx` (peer `typescript@^5`, so not a dependency) |
 | Docker / Compose | 29.5.3 / v5.1.4 | host |

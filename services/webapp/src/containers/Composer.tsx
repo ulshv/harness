@@ -27,6 +27,7 @@ export function Composer({ busy, onSend }: Props) {
       <TextArea
         className="flex-1"
         rows={2}
+        autoFocus
         placeholder="Ask the agent…"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}

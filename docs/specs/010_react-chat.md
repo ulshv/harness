@@ -109,7 +109,7 @@ holds 6 parts (3 reasoning, 3 tools) and the answer is one text part built from 
 
 ### Answer and composer
 
-- The answer: `react-markdown` + `remark-gfm` (tables), raw HTML off (the default), styled by
+- The answer: `react-markdown` + `remark-gfm` (tables), raw HTML shown as text (the default), styled by
   `@tailwindcss/typography` with its colors mapped to our tokens.
 - Composer: a textarea; Enter sends, Shift+Enter is a newline. While a turn streams the send button and Enter are
   disabled. The message list sticks to the bottom while streaming unless the user scrolled up.
@@ -219,3 +219,24 @@ Recorded during 010.1:
   never ends the browser's response, so the turn would stay "streaming" forever. `configure` destroys the
   response when the upstream one closes incomplete. A client-side idle watchdog would also cover half-open TCP
   and a prod reverse proxy; it's in the backlog.
+
+Recorded during 010.2:
+
+- **The live block's header shows the running summary** with a spinner (`Reasoning · 2 tool calls`), not just
+  "Working…": the counts are useful while the agent works too.
+- **`ACTIVITY_MAX_LINES` is applied in CSS `lh` units** (`max-height: 6lh`), so it stays "lines" whatever the font.
+- **`TailScroll` is a generic component** (a `ResizeObserver` on the content, pinned within 8 px of the bottom),
+  so 010.3 reuses it for the message list.
+- **A result with no matching call** gets a tool part named by the result's `name` (or empty) with `{}` args.
+- **Untrusted Markdown, after review**: images render as alt text and links open in a new tab; unknown event types
+  are skipped. `ACTIVITY_MAX_LINES` counts the box's padding too.
+
+Recorded during 010.3:
+
+- **`Button` variants** (`primary`, `quiet`) for "New chat": a table, so a third look is one line.
+- **"New chat" aborts the running request**, which the spec didn't spell out: otherwise the old run keeps
+  streaming into a cleared list and keeps spending tokens on harness.
+- **Sending doesn't re-pin the list.** If you scrolled up and send, the list stays where you are; it follows again
+  once you scroll to the bottom. Re-pinning on send needs an imperative handle on `TailScroll`; not worth it yet.
+  "New chat" does re-pin: `TailScroll` re-pins whenever its content fits.
+

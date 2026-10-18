@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HttpError, streamChat } from "./chat";
+import { HttpError, streamChat, type ChatEvent } from "./chat";
 
 // a response whose body arrives in exactly these chunks; bytes, to split a multi-byte character
 function sseResponse(...chunks: (string | Uint8Array)[]): Response {
@@ -33,8 +33,9 @@ describe("streamChat", () => {
       ),
     );
     vi.stubGlobal("fetch", fetch);
+    const signal = new AbortController().signal;
 
-    const events = await collect(streamChat({ message: "hi" }));
+    const events = await collect(streamChat({ message: "hi", thread_id: "t1" }, signal));
 
     expect(events).toEqual([
       { type: "text", text: "Hello" },
@@ -49,9 +50,34 @@ describe("streamChat", () => {
     expect(fetch).toHaveBeenCalledWith("/api/chat/stream", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: '{"message":"hi"}',
-      signal: undefined,
+      body: '{"message":"hi","thread_id":"t1"}',
+      signal,
     });
+  });
+
+  it("ends with the AbortError when aborted mid-stream", async () => {
+    const controller = new AbortController();
+    const encoder = new TextEncoder();
+    const endless = new ReadableStream({
+      start(stream) {
+        stream.enqueue(encoder.encode('event: text\ndata: {"text":"Hi"}\n\n'));
+        // what fetch does to a body when its request is aborted
+        controller.signal.addEventListener("abort", () => stream.error(controller.signal.reason));
+      },
+    });
+    vi.stubGlobal("fetch", async () => new Response(endless));
+
+    const events: ChatEvent[] = [];
+    const error = await (async () => {
+      for await (const event of streamChat({ message: "hi" }, controller.signal)) {
+        events.push(event);
+        controller.abort();
+      }
+    })().catch((err: unknown) => err);
+
+    expect(events).toEqual([{ type: "text", text: "Hi" }]);
+    // the rejected reader.cancel() in streamChat's finally doesn't replace it
+    expect(error).toMatchObject({ name: "AbortError" });
   });
 
   it("decodes a character split across chunks", async () => {
