@@ -86,3 +86,32 @@ services:
           path: ./services/testing-wms-mcp/uv.lock
         - action: rebuild
           path: ./services/testing-wms-mcp/pyproject.toml
+
+  # React chat (spec 010): the Vite dev server; it proxies /api/* to harness, so the browser needs no CORS
+  webapp:
+    build: ./services/webapp
+    environment:
+      HARNESS_URL: http://harness:8000
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      # busybox wget: alpine has no curl; 127.0.0.1 because Vite listens on IPv4 and `localhost` may be ::1
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    develop:
+      watch:
+        # Vite's HMR sees the synced files and patches the page without a reload
+        - action: sync
+          path: ./services/webapp/src
+          target: /app/src
+        - action: rebuild
+          path: ./services/webapp/package-lock.json
+        - action: rebuild
+          path: ./services/webapp/package.json
+        - action: rebuild
+          path: ./services/webapp/vite.config.ts
+        - action: rebuild
+          path: ./services/webapp/index.html

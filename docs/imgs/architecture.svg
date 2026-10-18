@@ -61,9 +61,9 @@
   <rect class="planned" x="186" y="474" width="122" height="52" rx="7"/>
   <text class="t planned-t" x="247.0" y="497.0">Plugins</text>
   <text class="s planned-s" x="247.0" y="513.0">custom tools</text>
-  <rect class="planned" x="320" y="474" width="122" height="52" rx="7"/>
-  <text class="t planned-t" x="381.0" y="497.0">MCP client</text>
-  <text class="s planned-s" x="381.0" y="513.0">registry</text>
+  <rect class="shipped" x="320" y="474" width="122" height="52" rx="7"/>
+  <text class="t shipped-t" x="381.0" y="497.0">MCP client</text>
+  <text class="s shipped-s" x="381.0" y="513.0">streamable HTTP</text>
   <rect class="planned" x="454" y="474" width="122" height="52" rx="7"/>
   <text class="t planned-t" x="515.0" y="497.0">Memory</text>
   <text class="s planned-s" x="515.0" y="513.0">checkpoints</text>
@@ -95,9 +95,9 @@
   <rect class="shipped" x="24" y="600" width="160" height="56" rx="7"/>
   <text class="t shipped-t" x="104.0" y="625.0">LLM providers</text>
   <text class="s shipped-s" x="104.0" y="641.0">DeepSeek · RouterAI</text>
-  <rect class="planned" x="296" y="600" width="170" height="56" rx="7"/>
-  <text class="t planned-t" x="381.0" y="625.0">MCP servers</text>
-  <text class="s planned-s" x="381.0" y="641.0">external tools</text>
+  <rect class="shipped" x="296" y="600" width="170" height="56" rx="7"/>
+  <text class="t shipped-t" x="381.0" y="625.0">MCP servers</text>
+  <text class="s shipped-s" x="381.0" y="641.0">external tools</text>
   <rect class="planned" x="495" y="600" width="190" height="56" rx="7"/>
   <text class="t planned-t" x="590.0" y="625.0">Langfuse</text>
   <text class="s planned-s" x="590.0" y="641.0">traces · evals</text>

@@ -12,7 +12,7 @@ a startup builds its own harness on.
 ![langgraph](https://img.shields.io/badge/LangGraph-1.2-1C3C3C)
 ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 
-**Started:** October 14th, 2026 · **Steps shipped:** [6](docs/history) · **Live demo:** coming soon
+**Started:** October 14th, 2026 · **Steps shipped:** [10](docs/history) · **Live demo:** coming soon
 
 > **Status: draft (work in progress), not a PoC.** Every shipped step is production-grade: layered code,
 > typed contracts, tests, docs and a reviewed design. Features land one at a time.
@@ -117,8 +117,8 @@ flowchart TB
 
     classDef shipped fill:#e8f5e9,stroke:#2e7d32,color:#1b1b1b
     classDef planned fill:#fafafa,stroke:#9e9e9e,stroke-dasharray:5 4,color:#424242
-    class chat_api,pipeline,agent,tools,llm shipped
-    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,mcp_client,memory,rag,auth,mcp,pg,idp,obs planned
+    class chat_api,pipeline,agent,tools,mcp_client,llm,mcp shipped
+    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,memory,rag,auth,pg,idp,obs planned
     style clients fill:#ffffff,stroke:#bdbdbd
     style harness fill:#ffffff,stroke:#bdbdbd
     style auth_box fill:#ffffff,stroke:#bdbdbd
@@ -145,11 +145,14 @@ A deeper walkthrough is in [`docs/arch/001_chat-request-flow.md`](docs/arch/001_
 - [x] `/chat/stream` and `/chat/invoke` on one pipeline; text batching (~10× fewer frames)
 - [x] Terminal `done` / `error` events with safe error codes and a recursion guard
 - [x] Live `reasoning` stream
+- [x] Conversations by `thread_id` (in memory for now)
+- [x] MCP client: tools from MCP servers join the agent at startup; a dead server or a failing tool never kills a run
+- [x] A testing warehouse for evals: a REST API with deliberate traps and an MCP server over it
 
 **Next**, in build order
 
 - [ ] React chat UI: streaming, tool calls, reasoning spoiler
-- [ ] Memory: conversation threads, Postgres checkpointer
+- [ ] Memory: Postgres checkpointer, conversations survive restarts
 - [ ] Deep agents: planning, virtual filesystem, subagents, with the agent's todo list in the UI
 - [ ] Auth service in Go: argon2id, EdDSA JWT + JWKS, refresh rotation
 - [ ] RBAC and the admin panel
@@ -193,7 +196,7 @@ event: tool_call
 data: {"id":"call_00_qJxXBvCuuGrvvrCFXHIr9647","name":"current_time","args":{}}
 
 event: tool_result
-data: {"tool_call_id":"call_00_qJxXBvCuuGrvvrCFXHIr9647","name":"current_time","content":"2026-10-14T20:04:19+00:00"}
+data: {"tool_call_id":"call_00_qJxXBvCuuGrvvrCFXHIr9647","name":"current_time","content":"2026-10-14T20:04:19+00:00","status":"success"}
 
 event: reasoning
 data: {"text":"Current time"}
@@ -216,6 +219,8 @@ data: {}
 - **Typed event contract** (`reasoning`, `text`, `tool_call`, `tool_result`, `done`, `error`) published as
   a discriminated union in OpenAPI, ready for a generated frontend client.
 - **Live reasoning.** Time to the first frame dropped from ~11.6 s of silence to ~1.4 s.
+- **MCP tools.** `MCP_SERVERS` lists servers; their tools join the agent as `<server>_<tool>`. A server down at
+  startup is skipped, a tool that fails mid-run becomes an error result (`tool_result.status`), and the run goes on.
 - **Safe failures.** Every stream ends with `done` or `error`. Error codes separate retryable provider
   outages from our own misconfiguration, and details stay in the logs.
 - **A dev loop that just works.** `make up` starts Docker Compose with hot reload; `make test` and

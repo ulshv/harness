@@ -12,7 +12,7 @@
 ![langgraph](https://img.shields.io/badge/LangGraph-1.2-1C3C3C)
 ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 
-**Старт:** 14 октября 2026 · **Сделано шагов:** [6](docs/history) · **Live demo:** скоро
+**Старт:** 14 октября 2026 · **Сделано шагов:** [10](docs/history) · **Live demo:** скоро
 
 > **Статус: draft (в работе), не PoC.** Каждый сделанный шаг — продакшен-уровня: слоистый код,
 > типизированные контракты, тесты, документация и отревьюенный дизайн. Фичи появляются по одной.
@@ -116,8 +116,8 @@ flowchart TB
 
     classDef shipped fill:#e8f5e9,stroke:#2e7d32,color:#1b1b1b
     classDef planned fill:#fafafa,stroke:#9e9e9e,stroke-dasharray:5 4,color:#424242
-    class chat_api,pipeline,agent,tools,llm shipped
-    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,mcp_client,memory,rag,auth,mcp,pg,idp,obs planned
+    class chat_api,pipeline,agent,tools,mcp_client,llm,mcp shipped
+    class chat_ui,admin_ui,ext_sys,admin_api,hooks,plugins,skills,memory,rag,auth,pg,idp,obs planned
     style clients fill:#ffffff,stroke:#bdbdbd
     style harness fill:#ffffff,stroke:#bdbdbd
     style auth_box fill:#ffffff,stroke:#bdbdbd
@@ -144,11 +144,14 @@ flowchart TB
 - [x] `/chat/stream` и `/chat/invoke` на одном конвейере; батчинг текста (в ~10 раз меньше кадров)
 - [x] Финальные события `done` / `error` с безопасными кодами ошибок и защитой от зацикливания
 - [x] Живой стрим `reasoning`
+- [x] Разговоры по `thread_id` (пока в памяти)
+- [x] MCP-клиент: тулзы MCP-серверов подключаются к агенту на старте; упавший сервер или тулза не валят прогон
+- [x] Тестовый склад для evals: REST API с намеренными ловушками и MCP-сервер поверх него
 
 **Дальше**, в порядке сборки
 
 - [ ] React-чат: стриминг, вызовы тулз, рассуждения под спойлером
-- [ ] Память: треды разговоров, Postgres-checkpointer
+- [ ] Память: Postgres-checkpointer, разговоры переживают рестарт
 - [ ] Deep agents: планирование, виртуальная файловая система, сабагенты; todo-лист агента в UI
 - [ ] Сервис авторизации на Go: argon2id, EdDSA JWT + JWKS, ротация refresh-токенов
 - [ ] RBAC и админка
@@ -192,7 +195,7 @@ event: tool_call
 data: {"id":"call_00_qJxXBvCuuGrvvrCFXHIr9647","name":"current_time","args":{}}
 
 event: tool_result
-data: {"tool_call_id":"call_00_qJxXBvCuuGrvvrCFXHIr9647","name":"current_time","content":"2026-10-14T20:04:19+00:00"}
+data: {"tool_call_id":"call_00_qJxXBvCuuGrvvrCFXHIr9647","name":"current_time","content":"2026-10-14T20:04:19+00:00","status":"success"}
 
 event: reasoning
 data: {"text":"Current time"}
@@ -215,6 +218,9 @@ data: {}
 - **Типизированный контракт событий** (`reasoning`, `text`, `tool_call`, `tool_result`, `done`, `error`)
   опубликован в OpenAPI как discriminated union — готов к генерации клиента для фронтенда.
 - **Живые рассуждения.** Время до первого кадра сократилось с ~11.6 с тишины до ~1.4 с.
+- **MCP-тулзы.** `MCP_SERVERS` перечисляет серверы; их тулзы подключаются к агенту как `<server>_<tool>`. Сервер,
+  лежащий на старте, пропускается, а тулза, упавшая посреди прогона, превращается в результат с ошибкой
+  (`tool_result.status`), и прогон идёт дальше.
 - **Безопасные ошибки.** Каждый стрим заканчивается `done` или `error`. Коды ошибок отделяют временные сбои
   провайдера, которые лечатся повтором, от нашей собственной ошибки конфигурации, а детали остаются в логах.
 - **Dev-цикл, который просто работает.** `make up` поднимает Docker Compose с hot reload; `make test` и
