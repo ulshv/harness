@@ -18,7 +18,7 @@ suggested order.
 |---|---|---|
 | 0 | Skeleton: monorepo, `compose.yaml` with `develop.watch`, healthchecks, harness serves `/health` and reloads on file save | done: history 000 |
 | 1 | First agent: LangGraph agent with one tool, token streaming over SSE, verify with `curl -N` | done: history 001; extended in 002 (production layout), 003 (`/chat/stream` + `/chat/invoke`, batching) 004 (`error` / `done` events) and 005 (`reasoning` event) |
-| 2 | React chat with streaming | in review: history 010 (text stream, activity block + Markdown, conversations by `thread_id`) |
+| 2 | React chat with streaming | done: history 010 (text stream, activity block + Markdown, conversations by `thread_id`) |
 | 3 | Memory: threads and Postgres checkpointer, conversation continues after a restart | started: history 008 (`thread_id`, in-memory checkpointer) |
 | 4 | deepagents: planning, virtual FS, subagents; the agent's todo list visible in the UI | — |
 | 5 | auth (Go): signup/login, passwords (argon2id), access JWT (EdDSA/RS256) + JWKS, refresh rotation, httpOnly cookie; harness validates tokens, anonymous gets 401 | — |
@@ -27,7 +27,7 @@ suggested order.
 | 8 | External MCP from the admin panel: server registry, credentials, the agent sees and calls their tools | started: history 009 (servers from `MCP_SERVERS` env, tools at startup) |
 | 9 | Observability: agent traces (Langfuse / OpenTelemetry), logs with trace-id across all services | — |
 | 10 | Kubernetes: minikube/kind + Tilt, same services, same hot-reload | — |
-| 11 | Evals in Langfuse: datasets of cases (curated, plus harvested from production traces), experiment runs against the agent, LLM-as-judge and code scorers, a regression gate in CI | started: history 006–007 (a testing warehouse and its MCP server) |
+| 11 | Evals in Langfuse: datasets of cases (curated, plus harvested from production traces), experiment runs against the agent, LLM-as-judge and code scorers, a regression gate in CI | later: the testing warehouse of 006–007 became the demo world of 011; evals come back once there's more to measure |
 | 12 | Custom tools as plugins: tools packaged and registered without touching the agent core | — |
 | 13 | Dictionaries: per-environment values that skills reference by name. One skill (say "update the deal amount") works across environments where the same MCP server exposes different internals (`cf_12345` in one CRM, `UF_CRM_AMOUNT` in another) | — |
 | 14 | Multi-tenancy: tenant isolation for threads, skills, dictionaries, MCP credentials | — |
@@ -40,12 +40,7 @@ ship separately.
 
 ## Next up (proposed, in suggested order)
 
-0. **React chat (roadmap step 2), 010.** [specs/010](specs/010_react-chat.md). The event contract is ready for a
-   frontend: a discriminated `ChatEvent` union in OpenAPI, `id` / `tool_call_id` pairing, batched text,
-   `reasoning`, `done` / `error`, `tool_result.status`. Substeps 010.1–010.3.
-1. **Evals (a first slice of step 11), branch `feat/evals`.** The warehouse is ready: `testing-wms` (006),
-   `testing-wms-mcp` (007), threads (008), MCP tools in harness (009).
-2. **Memory (roadmap step 3).** Threads already work in memory (008); next is the Postgres checkpointer, so a
+1. **Memory (roadmap step 3).** Threads already work in memory (008); next is the Postgres checkpointer, so a
    conversation survives a restart.
 
 ## Backlog
@@ -65,11 +60,11 @@ ship separately.
 | `interrupt` terminal event | the root graph swallows `GraphInterrupt` and emits `__interrupt__` in `updates`, so a paused run ends with `done` | human-in-the-loop (with deepagents, step 4) | history 004 |
 | Error code for context overflow | `ContextOverflowError` is `internal` now; the user can't act on that | memory (step 3) makes long histories common | history 004 |
 | Streaming fake with tool calls | `StreamingFakeModel` streams text only, so tool-call chunk streaming (`tool_call_chunks`) is untested | big-argument tools (step 4) | history 004 |
-| API key on `testing-wms` | the test API is open; real MCP integrations carry credentials | MCP credentials in harness (step 8) | spec 006 |
+| API keys on the testing systems | the test API is open; real MCP integrations carry credentials | MCP credentials in harness (step 8) | spec 006 |
 | harness on `mcp` 2 | harness's MCP client is `mcp` 1.x because `langchain-mcp-adapters` 0.3.2 requires `mcp<2`; the server side is already 2.3.0 | when the adapters support `mcp` 2 | spec 007 |
-| Threads: owner, storage, TTL | any client that knows a `thread_id` can read and continue it; threads live in process memory, every request without one leaves a thread behind, and `InMemorySaver` keeps a full history copy per step, until a restart | auth (step 5) for owners; Postgres with a TTL (step 3); deleting anonymous threads after their run (`adelete_thread`) if evals (010) make memory matter | spec 008 |
+| Threads: owner, storage, TTL | any client that knows a `thread_id` can read and continue it; threads live in process memory, every request without one leaves a thread behind, and `InMemorySaver` keeps a full history copy per step, until a restart | auth (step 5) for owners; Postgres with a TTL (step 3); deleting anonymous threads after their run (`adelete_thread`) if evals (step 11) make memory matter | spec 008 |
 | Interrupted runs break their thread | a run stopped between a tool call and its answer (`recursion_limit`, a disconnect, two requests on one thread) leaves an unanswered call; providers reject the history, so the thread fails from then on. No library repairs it except deepagents' `PatchToolCallsMiddleware` | moving to deepagents (step 4); reachable from the React chat since 010.3: after "Connection lost" the composer continues the same thread ("New chat" is the way out) | spec 008, review of 010.3 |
 | `crypto.randomUUID` needs a secure context | the webapp makes thread ids with it at first render; on plain http other than localhost it doesn't exist and the page is blank | serving the webapp over http on a non-localhost host (k8s ingress, step 10) | review of 010.3 |
 | Abort the run when the chat page unmounts | `useChat` aborts only on "New chat"; leaving the page mid-stream would let the agent run on | routing (`/admin`, step 6) | review of 010.3 |
 | Client idle watchdog in `streamChat` | the dev proxy now cuts a stream when harness dies mid-run, but a half-open TCP connection or a prod reverse proxy can still leave a turn "streaming" forever; reset a timer on the keepalive pings (`onComment`), abort after ~3 missed | the first prod-like deploy (step 10), or a Stop button (it needs the same `AbortController`) | review of 010.1 |
-| A dead tool gets retried | with the MCP server down, the agent called failing tools 7 times before giving up (smoke run, history 009) | a policy in the system prompt, measured by evals | history 009 |
+| A dead tool gets retried | with the MCP server down, the agent called failing tools 7 times before giving up (smoke run, history 009) | addressed in the demo prompt (011: retry a failing tool at most once); measured once evals return | history 009 |

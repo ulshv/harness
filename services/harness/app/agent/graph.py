@@ -10,19 +10,25 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from app.agent.errors import handle_tool_errors
 
-SYSTEM_PROMPT = "You are a concise assistant. Use tools when they help."
+DEFAULT_SYSTEM_PROMPT = "You are a concise assistant. Use tools when they help."
 # LangGraph 1.2 defaults to 10007 supersteps; a tool round is 2 (agent + tools): 25 allows 11 rounds + the answer
-RECURSION_LIMIT = 25
+DEFAULT_RECURSION_LIMIT = 25
 
 
-def build_graph(model: BaseChatModel, tools: Sequence[BaseTool]) -> CompiledStateGraph:
+def build_graph(
+    model: BaseChatModel,
+    tools: Sequence[BaseTool],
+    *,
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+    recursion_limit: int = DEFAULT_RECURSION_LIMIT,
+) -> CompiledStateGraph:
     # bind_tools only attaches JSON schemas to each request; executing tools is the graph's job
     llm = model.bind_tools(tools)
 
     # a node is just a function: gets the current state, returns a partial update
     async def agent(state: MessagesState):
         # system prompt is prepended per call, not stored in state (so it won't be checkpointed)
-        reply = await llm.ainvoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])
+        reply = await llm.ainvoke([SystemMessage(system_prompt), *state["messages"]])
         # MessagesState's add_messages reducer appends this to the list instead of overwriting it
         return {"messages": [reply]}
 
@@ -39,4 +45,4 @@ def build_graph(model: BaseChatModel, tools: Sequence[BaseTool]) -> CompiledStat
     # compile() validates the wiring and returns a runnable (invoke/astream). The checkpointer saves the state after
     # every step under the run's thread_id, and the next run on that thread starts from it
     graph = builder.compile(checkpointer=InMemorySaver())
-    return graph.with_config(recursion_limit=RECURSION_LIMIT)
+    return graph.with_config(recursion_limit=recursion_limit)

@@ -1,0 +1,29 @@
+[project]
+name = "testing-marketplace-mcp"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "httpx2==2.13.1",
+    "mcp==2.3.0",
+    "pydantic-settings==2.16.0",
+    "uvicorn[standard]==0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright==1.40.2",
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+]
+
+[tool.pytest.ini_options]
+# app/ isn't installed as a package, so let pytest import it from the service root
+pythonpath = ["."]
+
+[tool.ruff.lint]
+# defaults (E, F) + import order, pyupgrade, bugbear, simplify
+extend-select = ["I", "UP", "B", "SIM"]
+
+[tool.basedpyright]
+# "standard" catches real type errors; the default "recommended" also demands annotations on every test param
+typeCheckingMode = "standard"

@@ -1,11 +1,17 @@
-.PHONY: up test lint api-types
+.PHONY: up up\:demo test lint api-types
 
 # dev loop: build, start and sync code changes into containers (see develop.watch in compose.yaml).
 # --build: watch syncs only files changed after start, so a stale image would run old code; cached layers keep it fast
 up:
 	docker compose up --watch --build
 
-SERVICES := harness testing-wms testing-wms-mcp
+# the demo world: compose.testing.yaml adds the testing systems and wires them into harness (spec 011)
+up\:demo:
+	docker compose -f compose.yaml -f compose.testing.yaml up --watch --build
+
+SERVICES := harness \
+	testing/testing-wms-api testing/testing-wms-mcp testing/testing-erp-api testing/testing-erp-mcp \
+	testing/testing-marketplace-api testing/testing-marketplace-mcp testing/testing-chat-api testing/testing-chat-mcp
 
 test:
 	for s in $(SERVICES); do uv run --directory services/$$s pytest -q || exit 1; done

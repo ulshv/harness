@@ -15,7 +15,7 @@ builds its own AI agents on.
 ![langgraph](https://img.shields.io/badge/LangGraph-1.2-1C3C3C)
 ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 
-**Started:** October 14th, 2026 · **Steps shipped:** [11](docs/history) · **Live demo:** coming soon
+**Started:** October 14th, 2026 · **Steps shipped:** [12](docs/history) · **Live demo:** coming soon
 
 > **Status: draft (work in progress), not a PoC.** Every shipped step is production-grade: layered code,
 > typed contracts, tests, docs and a reviewed design. Features land one at a time.
@@ -30,8 +30,8 @@ AI tools speed up the typing; I review every line and rework the core until it m
 
 Not every line gets the same treatment though... The core (the agent runtime in `services/harness`, the auth service
 in `services/auth`) and the infrastructure go through strict review: I clean up and rework the assistant's code
-until I'd put my name on every line. The supporting code (the chat UI in `services/webapp`, the testing
-warehouse API and its MCP server, unit tests) is reviewed and fixed where it matters, but not polished to the
+until I'd put my name on every line. The supporting code (the chat UI in `services/webapp`, the demo
+systems in `services/testing`, unit tests) is reviewed and fixed where it matters, but not polished to the
 same standard: it has to be correct and readable, not elegant.
 
 ## Quick start
@@ -41,9 +41,13 @@ Requires Docker with Compose ≥ 2.22, `make`, and [`uv`](https://docs.astral.sh
 1. `git clone https://github.com/ulshv/harness.git && cd harness`
 2. `cp .env.example .env`
 3. Fill in the variables: at least `LLM_API_KEY` (any OpenAI-compatible endpoint; defaults: RouterAI + DeepSeek).
-4. `make up` starts all services with hot reload.
+4. `make up:demo` starts all services with hot reload, plus the demo world (`make up`: harness and the web chat only).
 5. Open http://localhost:8080.
 6. Start chatting! Ask the agent what it can do.
+
+The demo world is **CoffeeSupplies LLC**, a coffee and barista-equipment distributor with four systems the agent
+reaches as MCP servers: a warehouse, an ERP, a marketplace seller account and a team chat. Ask "Anything stuck
+across our systems today?", then "Go ahead".
 
 The OpenAPI UI is at `localhost:8000/docs`; `make test && make lint` runs the checks.
 
@@ -178,6 +182,7 @@ A deeper walkthrough is in [`docs/arch/001_chat-request-flow.md`](docs/arch/001_
 - [x] MCP client: tools from MCP servers join the agent at startup; a dead server or a failing tool never kills a run
 - [x] A testing warehouse for evals: a REST API with deliberate traps and an MCP server over it
 - [x] React chat: streaming Markdown answer, live reasoning and tool calls, conversations
+- [x] A demo world: a warehouse, an ERP, a marketplace and a team chat as MCP servers; the agent finds what's stuck between them and fixes it
 
 **Next**, in build order
 
@@ -191,11 +196,11 @@ A deeper walkthrough is in [`docs/arch/001_chat-request-flow.md`](docs/arch/001_
 - [ ] Dictionaries: portable skills with per-environment values
 - [ ] RAG: knowledge bases, pgvector, hybrid search, citations in the chat
 - [ ] Observability: agent traces in Langfuse, trace-id across services
-- [ ] Evals in Langfuse: datasets from production traces, LLM-as-judge, a regression gate in CI
 - [ ] Multi-tenancy
 
 **Later**
 
+- [ ] Evals in Langfuse: datasets from production traces, LLM-as-judge, a regression gate in CI
 - [ ] Kubernetes: the same services and the same hot-reload dev loop, via kind/minikube + Tilt
 - [ ] SSO / OAuth (OIDC)
 - [ ] Inbound webhooks: external systems trigger agent runs, authenticated with OAuth client credentials or API keys

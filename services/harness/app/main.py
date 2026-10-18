@@ -10,17 +10,24 @@ from app.agent.mcp import load_mcp_tools
 from app.agent.tools import TOOLS
 from app.api import health
 from app.api.chat import chat
-from app.settings import McpSettings, load_llm_settings
+from app.settings import AgentSettings, McpSettings, load_llm_settings
 
 type GraphFactory = Callable[[], Awaitable[CompiledStateGraph]]
 
 
 # async: loading MCP tools talks to the servers
 async def default_graph() -> CompiledStateGraph:
-    # LLM settings first: a bad .env fails the boot before any wait on MCP servers
+    # settings first: a bad .env or prompt path fails the boot before any wait on MCP servers
     model = make_model(load_llm_settings())
+    agent = AgentSettings()
+    system_prompt = agent.system_prompt()
     mcp_tools = await load_mcp_tools(McpSettings().servers)
-    return build_graph(model, [*TOOLS, *mcp_tools])
+    return build_graph(
+        model,
+        [*TOOLS, *mcp_tools],
+        system_prompt=system_prompt,
+        recursion_limit=agent.recursion_limit,
+    )
 
 
 # the factory parameter is the seam for tests: they pass a graph with a fake model

@@ -1,0 +1,131 @@
+// The CoffeeSupplies LLC ERP (spec 011): customers, sales orders from every channel, purchase orders.
+// Rows of a demo scenario carry a comment naming it (S1–S5); the rest is background.
+// Times are offsets from startup: "-12d" is twelve days before the service started.
+{
+  "customers": [
+    { "id": "CUST-001", "name": "Hotel Aurora", "type": "b2b", "account_manager": "Maria Lopez", "payment_terms_days": 30 },
+    { "id": "CUST-002", "name": "Blue Harbor Café", "type": "b2b", "account_manager": "Maria Lopez", "payment_terms_days": 30 },
+    { "id": "CUST-003", "name": "Corner Bakery", "type": "b2b", "account_manager": "Maria Lopez", "payment_terms_days": 14 },
+    { "id": "CUST-004", "name": "Emma Schulz", "type": "consumer" },
+    { "id": "CUST-005", "name": "Olivia Grant", "type": "consumer" },
+    { "id": "CUST-006", "name": "Lucas Meyer", "type": "consumer" },
+    // every marketplace order belongs here; the buyer's own name stays on the marketplace
+    { "id": "CUST-007", "name": "Marketplace buyers", "type": "marketplace", "account_manager": "Alex Reed" },
+  ],
+
+  "sales_orders": [
+    {
+      "id": "SO-1030", "customer_id": "CUST-002", "channel": "b2b", "wms_order_id": "OUT-5030",
+      "lines": [{ "sku": "COF-HOU-1KG", "qty": 30, "unit_price": "19.50" }, { "sku": "CUP-PAP-8OZ", "qty": 4, "unit_price": "45.00" }],
+      "delivery_by": "-9d", "invoice": { "due": "-1d", "paid": true }, "status": "fulfilled",
+    },
+    {
+      "id": "SO-1031", "customer_id": "CUST-001", "channel": "b2b", "wms_order_id": "OUT-5031",
+      "lines": [{ "sku": "TEA-BLK-100", "qty": 10, "unit_price": "8.50" }, { "sku": "SYR-VAN", "qty": 6, "unit_price": "11.00" }],
+      "delivery_by": "-20d", "invoice": { "due": "-10d", "paid": true }, "status": "fulfilled",
+    },
+    {
+      "id": "SO-1032", "customer_id": "CUST-007", "channel": "marketplace", "marketplace_order_id": "114-1022854",
+      "wms_order_id": "OUT-5032",
+      "lines": [{ "sku": "GRN-HOME", "qty": 1, "unit_price": "129.00" }],
+      "delivery_by": "-6d", "invoice": { "due": "-8d", "paid": true }, "status": "fulfilled",
+    },
+    {
+      "id": "SO-1033", "customer_id": "CUST-005", "channel": "web", "wms_order_id": "OUT-5033",
+      "lines": [{ "sku": "KET-GOOSE", "qty": 1, "unit_price": "59.00" }, { "sku": "FLT-V60-100", "qty": 2, "unit_price": "6.50" }],
+      "delivery_by": "-4d", "invoice": { "due": "-6d", "paid": true }, "status": "fulfilled",
+    },
+    {
+      "id": "SO-1034", "customer_id": "CUST-003", "channel": "b2b", "wms_order_id": "OUT-5034",
+      "lines": [
+        { "sku": "COF-ESP-1KG", "qty": 20, "unit_price": "24.00" },
+        { "sku": "CUP-PAP-8OZ", "qty": 2, "unit_price": "45.00" },
+        { "sku": "LID-8OZ", "qty": 2, "unit_price": "28.00" },
+      ],
+      "delivery_by": "+2d", "invoice": { "due": "+12d", "paid": false },
+    },
+    {
+      "id": "SO-1035", "customer_id": "CUST-007", "channel": "marketplace", "marketplace_order_id": "114-2290475",
+      "wms_order_id": "OUT-5035",
+      "lines": [{ "sku": "TEA-GRN-100", "qty": 2, "unit_price": "9.50" }],
+      "delivery_by": "+2d", "invoice": { "due": "-1d", "paid": true },
+    },
+    {
+      "id": "SO-1036", "customer_id": "CUST-006", "channel": "web", "wms_order_id": "OUT-5036",
+      "lines": [{ "sku": "GRN-PRO", "qty": 1, "unit_price": "640.00" }],
+      "delivery_by": "+3d", "invoice": { "due": "-1d", "paid": true },
+    },
+    {
+      "id": "SO-1037", "customer_id": "CUST-001", "channel": "b2b", "wms_order_id": "OUT-5037",
+      "lines": [{ "sku": "SYR-VAN", "qty": 12, "unit_price": "11.00" }, { "sku": "TEA-GRN-100", "qty": 6, "unit_price": "9.50" }],
+      "delivery_by": "+4d", "invoice": { "due": "+26d", "paid": false },
+    },
+    {
+      "id": "SO-1038", "customer_id": "CUST-007", "channel": "marketplace", "marketplace_order_id": "114-4418306",
+      "wms_order_id": "OUT-5038",
+      "lines": [{ "sku": "FLT-V60-100", "qty": 3, "unit_price": "6.50" }],
+      "delivery_by": "+2d", "invoice": { "due": "-1d", "paid": true },
+    },
+    {
+      "id": "SO-1039", "customer_id": "CUST-003", "channel": "b2b", "wms_order_id": "OUT-5039",
+      "lines": [{ "sku": "COF-DEC-1KG", "qty": 8, "unit_price": "22.00" }],
+      "delivery_by": "+3d", "invoice": { "due": "+13d", "paid": false },
+    },
+    {
+      "id": "SO-1040", "customer_id": "CUST-007", "channel": "marketplace", "marketplace_order_id": "114-6093711",
+      "wms_order_id": "OUT-5040",
+      "lines": [{ "sku": "COF-ESP-1KG", "qty": 2, "unit_price": "24.00" }],
+      "delivery_by": "+2d", "invoice": { "due": "-1d", "paid": true },
+    },
+    // S1: Hotel Aurora's grinders: delivery isn't due for 5 days, but the invoice is 12 days overdue.
+    {
+      "id": "SO-1041", "customer_id": "CUST-001", "channel": "b2b", "wms_order_id": "OUT-5041",
+      "lines": [{ "sku": "GRN-HOME", "qty": 10, "unit_price": "129.00" }],
+      "delivery_by": "+5d", "invoice": { "due": "-12d", "paid": false },
+    },
+    // S4: Blue Harbor Café's beans for tomorrow; the warehouse has 15 of 40 until PO-2207 arrives.
+    {
+      "id": "SO-1045", "customer_id": "CUST-002", "channel": "b2b", "wms_order_id": "OUT-5045",
+      "lines": [{ "sku": "COF-HOU-1KG", "qty": 40, "unit_price": "19.50" }],
+      "delivery_by": "+1d", "invoice": { "due": "+20d", "paid": false },
+    },
+    // S5: a paid web shop order for tomorrow, waiting on the frothers in receiving.
+    {
+      "id": "SO-1048", "customer_id": "CUST-004", "channel": "web", "wms_order_id": "OUT-5048",
+      "lines": [{ "sku": "FRT-ELEC", "qty": 6, "unit_price": "39.00" }],
+      "delivery_by": "+1d", "invoice": { "due": "-1d", "paid": true },
+    },
+    // S2: the marketplace order that took the last two kettles.
+    {
+      "id": "SO-1050", "customer_id": "CUST-007", "channel": "marketplace", "marketplace_order_id": "114-5520917",
+      "wms_order_id": "OUT-5050",
+      "lines": [{ "sku": "KET-GOOSE", "qty": 2, "unit_price": "59.00" }],
+      "delivery_by": "+3d", "invoice": { "due": "-1d", "paid": true },
+    },
+    // S1: the paid marketplace order that must ship within 6 hours.
+    {
+      "id": "SO-1052", "customer_id": "CUST-007", "channel": "marketplace", "marketplace_order_id": "114-3349201",
+      "wms_order_id": "OUT-5052",
+      "lines": [{ "sku": "GRN-HOME", "qty": 6, "unit_price": "129.00" }],
+      "delivery_by": "+2d", "invoice": { "due": "-1d", "paid": true },
+    },
+    // S3 is the marketplace order 114-7781302 that has no row here at all.
+  ],
+
+  "purchase_orders": [
+    {
+      "id": "PO-2201", "supplier": "Highland Tea Co.", "status": "received", "expected_at": "-10d",
+      "lines": [{ "sku": "TEA-BLK-100", "qty": 100 }],
+    },
+    // S5: the frother pallet arrived on time two days ago; it's still in receiving.
+    {
+      "id": "PO-2204", "supplier": "Brewline Appliances", "status": "received", "expected_at": "-2d",
+      "lines": [{ "sku": "FRT-ELEC", "qty": 48 }],
+    },
+    // S4: house blend expected three days ago and still not here; Blue Harbor Café's order waits on it.
+    {
+      "id": "PO-2207", "supplier": "Andes Coffee Importers", "status": "open", "expected_at": "-3d",
+      "lines": [{ "sku": "COF-HOU-1KG", "qty": 200 }],
+    },
+  ],
+}

@@ -6,16 +6,9 @@ services:
     # graceful timeout: an open SSE stream would otherwise block the reload forever
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app --timeout-graceful-shutdown 3
     env_file: .env
-    environment:
-      # dev wiring, not a secret: the agent gets the warehouse tools as wms_*
-      MCP_SERVERS: '{"wms": "http://testing-wms-mcp:8101/mcp"}'
     ports:
       # loopback only: until auth lands, anyone on the LAN could spend the LLM key
       - "127.0.0.1:8000:8000"
-    depends_on:
-      # tools load at startup; a dead server would only be skipped, but in dev we want them there
-      testing-wms-mcp:
-        condition: service_healthy
     healthcheck:
       # the slim image has no curl, but python is always there
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -34,58 +27,6 @@ services:
           path: ./services/harness/uv.lock
         - action: rebuild
           path: ./services/harness/pyproject.toml
-
-  # warehouse API for evals (spec 006): in-memory store, reset via POST /_reset
-  testing-wms:
-    build: ./services/testing-wms
-    # no --workers: the store lives in process memory; any .py reload resets it to the seed
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload --reload-dir app
-    ports:
-      - "127.0.0.1:8100:8100"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-    develop:
-      watch:
-        # seed.jsonc is synced too, but only .py edits reload; POST /_reset rereads the seed
-        - action: sync
-          path: ./services/testing-wms/app
-          target: /app/app
-        - action: rebuild
-          path: ./services/testing-wms/uv.lock
-        - action: rebuild
-          path: ./services/testing-wms/pyproject.toml
-
-  # MCP server over testing-wms (spec 007): a thin adapter, no state of its own
-  testing-wms-mcp:
-    build: ./services/testing-wms-mcp
-    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8101 --reload --reload-dir app
-    environment:
-      # compose's network gives every service its name as a hostname
-      WMS_URL: http://testing-wms:8100
-    ports:
-      - "127.0.0.1:8101:8101"
-    depends_on:
-      testing-wms:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8101/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-    develop:
-      watch:
-        - action: sync
-          path: ./services/testing-wms-mcp/app
-          target: /app/app
-        - action: rebuild
-          path: ./services/testing-wms-mcp/uv.lock
-        - action: rebuild
-          path: ./services/testing-wms-mcp/pyproject.toml
 
   # React chat (spec 010): the Vite dev server; it proxies /api/* to harness, so the browser needs no CORS
   webapp:

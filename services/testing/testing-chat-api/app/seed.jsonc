@@ -1,0 +1,29 @@
+// The CoffeeSupplies LLC team chat (spec 011): people, channels and some history.
+// Messages that hint at a demo scenario carry a comment naming it; the rest is background.
+// Times are offsets from startup: "-2d" is two days before the service started.
+{
+  "users": [
+    { "handle": "@maria", "name": "Maria Lopez", "role": "B2B account manager" },
+    { "handle": "@alex", "name": "Alex Reed", "role": "E-commerce and marketplace manager" },
+    { "handle": "@tom", "name": "Tom Becker", "role": "Warehouse lead" },
+    { "handle": "@nina", "name": "Nina Park", "role": "Purchasing" },
+  ],
+
+  "channels": [
+    { "name": "#ops", "topic": "Day-to-day operations across all channels" },
+    { "name": "#sales", "topic": "B2B customers, web shop and marketplace sales" },
+    { "name": "#warehouse", "topic": "Receiving, put-away, picking and dispatch" },
+    { "name": "#purchasing", "topic": "Suppliers and purchase orders" },
+  ],
+
+  "messages": [
+    { "id": 1, "to": "#ops", "author": "@alex", "sent_at": "-6d", "text": "Weekly check: marketplace account health is green, no late shipments." },
+    // S4: the supplier's promise that PO-2207 would arrive in two days, four days ago.
+    { "id": 2, "to": "#purchasing", "author": "@nina", "sent_at": "-4d", "text": "Andes confirmed PO-2207, arriving in 2 days." },
+    { "id": 3, "to": "#sales", "author": "@maria", "sent_at": "-3d", "text": "Corner Bakery renewed their contract for another year." },
+    // S5: the pallet that was to be put away "tomorrow", two days ago.
+    { "id": 4, "to": "#warehouse", "author": "@tom", "sent_at": "-2d", "text": "Frother pallet in, will put away tomorrow." },
+    { "id": 5, "to": "#warehouse", "author": "@tom", "sent_at": "-1d", "text": "Dock 2 is free this afternoon for outbound." },
+    { "id": 6, "to": "#ops", "author": "@alex", "sent_at": "-1d", "text": "Kettles are selling well on the marketplace this week." },
+  ],
+}
