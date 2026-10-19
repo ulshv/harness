@@ -34,6 +34,14 @@ until I'd put my name on every line. The supporting code (the chat UI in `servic
 systems in `services/testing`, unit tests) is reviewed and fixed where it matters, but not polished to the
 same standard: it has to be correct and readable, not elegant.
 
+## Demo
+
+One question, four systems. The agent walks the warehouse, the ERP, the marketplace and the team chat of
+CoffeeSupplies LLC, finds five things stuck between them, proposes a plan, and on "Go ahead" fixes
+them and tells the right people. Every step shows up live in the chat.
+
+[![The CoffeeSupplies demo on YouTube](docs/imgs/demo_v1_thumbnail.jpg)](https://www.youtube.com/watch?v=qFT8aa3LJdw)
+
 ## Quick start
 
 Requires Docker with Compose ≥ 2.22, `make`, and [`uv`](https://docs.astral.sh/uv/) for running tests locally.
