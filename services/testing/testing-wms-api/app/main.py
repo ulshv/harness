@@ -10,7 +10,7 @@ from app.store import Warehouse, WarehouseError, load_seed
 
 # a real WMS answers after a database round trip; an in-memory dict answers in microseconds, and the chat's
 # spinners and out-of-order parallel results would never show
-LATENCY_SECONDS = (0.1, 0.5)
+LATENCY_SECONDS = (0.3, 1.0)
 
 
 # the store parameter is the seam for tests: each test app gets its own fresh store; tests skip the latency

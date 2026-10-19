@@ -9,7 +9,7 @@ from app.schemas import Store
 from app.store import Marketplace, MarketplaceError, load_seed
 
 # a real marketplace API answers after a network and database round trip, like testing-wms-api (history 010.4)
-LATENCY_SECONDS = (0.1, 0.5)
+LATENCY_SECONDS = (0.3, 1.0)
 
 
 # the store parameter is the seam for tests: each test app gets its own fresh store; tests skip the latency
